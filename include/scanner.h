@@ -10,6 +10,7 @@ class Scanner
     std::string source;
     int start = 0, current = 0, line = 1;
     const std::map<std::string, TokenType> keywords = {
+        {"class", TokenType::CLASS},
         {"and", TokenType::AND},
         {"else", TokenType::ELSE},
         {"false", TokenType::FALSE},

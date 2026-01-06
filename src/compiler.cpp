@@ -70,58 +70,81 @@ int Compiler::resolveUpvalue(CompilerState* s, std::string& n)
 
 void Compiler::compileFunction(const std::shared_ptr<FunctionStmt>& s, bool isMethod)
 {
-    current->function->name = s->name.lexeme;
-    current->function->arity = static_cast<int>(s->params.size());
-
-    if (isMethod)
-    {
-        current->locals.push_back({"this", 0, false, true}); // this 是 const
-    }
-    else
-    {
-        current->locals.push_back({"", 0, false, false});
-    }
-
     int gIdx = -1;
-    if (current->scopeDepth > 0)
-        current->locals.push_back({s->name.lexeme, current->scopeDepth, false});
-    else
+
+    if (!isMethod)
     {
-        gIdx = currentChunk()->addConstant(vm.newString(s->name.lexeme));
-        emitBytes(static_cast<uint8_t>(OpCode::OP_CONSTANT), static_cast<uint8_t>(gIdx));
-        emitBytes(static_cast<uint8_t>(OpCode::OP_DEFINE_GLOBAL), static_cast<uint8_t>(gIdx));
+        if (current->scopeDepth > 0)
+        {
+            current->locals.push_back({s->name.lexeme, current->scopeDepth, false, false});
+        }
+        else
+        {
+            gIdx = currentChunk()->addConstant(vm.newString(s->name.lexeme));
+        }
     }
 
     auto* next = new CompilerState();
     next->enclosing = current;
     next->function = vm.allocate<ObjFunction>();
-    vm.tempRoots.push_back(next->function); // GC Protect
+    vm.tempRoots.push_back(next->function);
 
+    // 设置函数基本信息
     next->function->name = s->name.lexeme;
     next->function->arity = static_cast<int>(s->params.size());
-    next->locals.push_back({"", 0, false});
+
+    if (isMethod)
+    {
+        next->locals.push_back({"this", 0, false, true});
+    }
+    else
+    {
+        next->locals.push_back({"", 0, false, false});
+    }
+
     current = next;
     current->scopeDepth++;
-    for (const auto& p : s->params) current->locals.push_back({p.lexeme, current->scopeDepth, false});
-    for (auto& b : s->body) compileStmt(b);
-    emitByte(static_cast<uint8_t>(OpCode::OP_NIL));
+
+    for (const auto& p : s->params)
+    {
+        // 参数作为局部变量加入作用域
+        current->locals.push_back({p.lexeme, current->scopeDepth, false, false});
+    }
+
+    for (auto& b : s->body)
+    {
+        compileStmt(b);
+    }
+
+    if (isMethod && s->name.lexeme == "constructor")
+    {
+        emitBytes(static_cast<uint8_t>(OpCode::OP_GET_LOCAL), 0);
+    }
+    else
+    {
+        emitByte(static_cast<uint8_t>(OpCode::OP_NIL));
+    }
+
     emitByte(static_cast<uint8_t>(OpCode::OP_RETURN));
 
     ObjFunction* f = current->function;
     const auto ups = current->upvalues;
-    vm.tempRoots.pop_back(); // Unprotect
+
+    vm.tempRoots.pop_back();
 
     current = current->enclosing;
     delete next;
 
     const int idx = currentChunk()->addConstant(f);
+
     emitBytes(static_cast<uint8_t>(OpCode::OP_CLOSURE), static_cast<uint8_t>(idx));
+
     for (const auto& u : ups)
     {
         emitByte(u.isLocal ? 1 : 0);
         emitByte(u.index);
     }
-    if (current->scopeDepth == 0)
+    if (!isMethod && current->scopeDepth == 0)
     {
         emitBytes(static_cast<uint8_t>(OpCode::OP_DEFINE_GLOBAL), static_cast<uint8_t>(gIdx));
     }
@@ -206,49 +229,7 @@ void Compiler::compileStmt(const std::shared_ptr<Stmt>& stmt)
     }
     else if (const auto function_stmt = std::dynamic_pointer_cast<FunctionStmt>(stmt))
     {
-        int gIdx = -1;
-        if (current->scopeDepth > 0)
-            current->locals.push_back({function_stmt->name.lexeme, current->scopeDepth, false});
-        else
-        {
-            gIdx = currentChunk()->addConstant(vm.newString(function_stmt->name.lexeme));
-            emitBytes(static_cast<uint8_t>(OpCode::OP_CONSTANT), static_cast<uint8_t>(gIdx));
-            emitBytes(static_cast<uint8_t>(OpCode::OP_DEFINE_GLOBAL), static_cast<uint8_t>(gIdx));
-        }
-
-        auto* next = new CompilerState();
-        next->enclosing = current;
-        next->function = vm.allocate<ObjFunction>();
-        vm.tempRoots.push_back(next->function); // GC Protect
-
-        next->function->name = function_stmt->name.lexeme;
-        next->function->arity = static_cast<int>(function_stmt->params.size());
-        next->locals.push_back({"", 0, false});
-        current = next;
-        current->scopeDepth++;
-        for (const auto& p : function_stmt->params) current->locals.push_back({p.lexeme, current->scopeDepth, false});
-        for (auto& b : function_stmt->body) compileStmt(b);
-        emitByte(static_cast<uint8_t>(OpCode::OP_NIL));
-        emitByte(static_cast<uint8_t>(OpCode::OP_RETURN));
-
-        ObjFunction* f = current->function;
-        const auto ups = current->upvalues;
-        vm.tempRoots.pop_back(); // Unprotect
-
-        current = current->enclosing;
-        delete next;
-
-        const int idx = currentChunk()->addConstant(f);
-        emitBytes(static_cast<uint8_t>(OpCode::OP_CLOSURE), static_cast<uint8_t>(idx));
-        for (const auto& u : ups)
-        {
-            emitByte(u.isLocal ? 1 : 0);
-            emitByte(u.index);
-        }
-        if (current->scopeDepth == 0)
-        {
-            emitBytes(static_cast<uint8_t>(OpCode::OP_DEFINE_GLOBAL), static_cast<uint8_t>(gIdx));
-        }
+        compileFunction(function_stmt, false);
     }
     else if (const auto return_stmt = std::dynamic_pointer_cast<ReturnStmt>(stmt))
     {
@@ -262,13 +243,12 @@ void Compiler::compileStmt(const std::shared_ptr<Stmt>& stmt)
         emitBytes(static_cast<uint8_t>(OpCode::OP_CLASS), static_cast<uint8_t>(nameIdx));
         emitBytes(static_cast<uint8_t>(OpCode::OP_DEFINE_GLOBAL), static_cast<uint8_t>(nameIdx)); // 定义类名
         emitBytes(static_cast<uint8_t>(OpCode::OP_GET_GLOBAL), static_cast<uint8_t>(nameIdx));
-
         for (auto& method : class_stmt->methods)
         {
             const int constIdx = currentChunk()->addConstant(vm.newString(method->name.lexeme));
 
             // 编译方法体
-            compileFunction(method, true); // true 表示这是一个方法
+            compileFunction(method, true);
 
             emitBytes(static_cast<uint8_t>(OpCode::OP_METHOD), static_cast<uint8_t>(constIdx));
         }

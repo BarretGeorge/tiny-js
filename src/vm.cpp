@@ -425,7 +425,6 @@ void VM::run()
                 if (Value callee = stack[calleeSlot]; isObjType(callee, ObjType::CLOSURE))
                 {
                     auto* cl = dynamic_cast<ObjClosure*>(std::get<Obj*>(callee));
-                    // Slots starts at Callee (slot 0 for new frame)
                     frames.push_back({cl, cl->function->chunk.code.data(), calleeSlot});
                     frame = &frames.back();
                 }
@@ -448,10 +447,10 @@ void VM::run()
                     // 将栈上的 Class 替换为 Instance (作为 this)
                     stack[calleeSlot] = instance;
 
-                    // 检查是否有构造函数 'init'
-                    if (klass->methods.count("init"))
+                    // 检查是否有构造函数 'constructor'
+                    if (klass->methods.contains("constructor"))
                     {
-                        ObjClosure* init = klass->methods["init"];
+                        ObjClosure* init = klass->methods["constructor"];
                         // 创建帧，开始执行 init 方法
                         frames.push_back({init, init->function->chunk.code.data(), calleeSlot});
                         frame = &frames.back();
@@ -520,8 +519,6 @@ void VM::run()
             {
                 int count = READ_BYTE();
                 auto* list = allocate<ObjList>(); // 创建对象
-                // 栈顶的 count 个元素就是列表内容（顺序是压栈顺序）
-                // 注意：stack.back() 是最后一个元素
                 list->elements.resize(count);
                 for (int i = count - 1; i >= 0; i--)
                 {
