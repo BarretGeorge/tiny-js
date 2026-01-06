@@ -1,0 +1,11 @@
+/cmake-build-debug/
+
+build
+
+*.log
+
+.DS_Store
+
+.idea
+
+scripts/tiny_js

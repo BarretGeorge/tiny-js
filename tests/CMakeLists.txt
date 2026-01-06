@@ -1,0 +1,6 @@
+file(GLOB TEST_SOURCES "*.cpp")
+file(GLOB CPP_SOURCES "${PROJECT_SOURCE_DIR}/src/*.cpp" "${PROJECT_SOURCE_DIR}/src/native/*.cpp")
+foreach(TEST_SOURCE ${TEST_SOURCES})
+    get_filename_component(TEST_NAME ${TEST_SOURCE} NAME_WE)
+    add_executable(${TEST_NAME} ${TEST_SOURCE} ${CPP_SOURCES})
+endforeach()
