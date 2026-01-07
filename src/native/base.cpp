@@ -102,6 +102,22 @@ Value nativeListAt(VM& vm, int argc, const Value* args)
     return list->elements[index];
 }
 
+Value nativeStringAt(VM& vm, const int argc, const Value* args)
+{
+    const Value receiver = args[-1];
+    const auto* str = dynamic_cast<ObjString*>(std::get<Obj*>(receiver));
+    if (argc < 1 || !std::holds_alternative<double>(args[0]))
+    {
+        throw std::runtime_error("Index must be a number.");
+    }
+    const int index = static_cast<int>(std::get<double>(args[0]));
+    if (index < 0 || index >= str->chars.size())
+    {
+        throw std::runtime_error("String index out of bounds.");
+    }
+    return Value{new ObjString(std::string(1, str->chars[index]))};
+}
+
 Value nativeStringIndexOf(VM& vm, int argc, const Value* args)
 {
     const Value receiver = args[-1];

@@ -17,7 +17,7 @@ function greet(name) {
 print(greet("World"));
 
 str = "Count: ";
-for (var i = 0; i < 5; i = i + 1) {
+for (var i = 0; i < 5; i++) {
     str = str + "(" + i + ") ";
     print(str);
 }

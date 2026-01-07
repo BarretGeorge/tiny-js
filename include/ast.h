@@ -2,6 +2,7 @@
 #define TINY_JS_AST_H
 
 #include "token.h"
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -86,6 +87,19 @@ struct Call : Expr
     std::vector<std::shared_ptr<Expr>> args;
 
     Call(auto c, auto a) : callee(c), args(a)
+    {
+    }
+};
+
+// 自增自减表达式
+struct UpdateExpr : Expr
+{
+    Token name;
+    bool isIncrement;
+    bool isPostfix;
+
+    UpdateExpr(Token n, bool inc, bool post)
+        : name(std::move(n)), isIncrement(inc), isPostfix(post)
     {
     }
 };

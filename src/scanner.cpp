@@ -48,9 +48,11 @@ void Scanner::scanToken(std::vector<Token>& t)
         break;
     case '.': addToken(t, TokenType::DOT);
         break;
-    case '-': addToken(t, TokenType::MINUS);
+    case '-':
+        addToken(t, match('-') ? TokenType::MINUS_MINUS : TokenType::MINUS);
         break;
-    case '+': addToken(t, TokenType::PLUS);
+    case '+':
+        addToken(t, match('+') ? TokenType::PLUS_PLUS : TokenType::PLUS);
         break;
     case ';': addToken(t, TokenType::SEMICOLON);
         break;
@@ -102,7 +104,7 @@ void Scanner::scanToken(std::vector<Token>& t)
     case '\'': string(t, '\'');
         break;
     default: if (isdigit(c)) number(t);
-        else if (isalpha(c) || c == '_') identifier(t);
+        if (isalpha(c) || c == '_') identifier(t);
         break;
     }
 }

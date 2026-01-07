@@ -21,6 +21,8 @@ Value nativeListPop(VM& vm, int argc, const Value* args);
 
 Value nativeListAt(VM& vm, int argc, const Value* args);
 
+Value nativeStringAt(VM& vm, int argc, const Value* args);
+
 Value nativeStringIndexOf(VM& vm, int argc, const Value* args);
 
 Value nativeStringSubstring(VM& vm, int argc, const Value* args);

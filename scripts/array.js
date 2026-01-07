@@ -12,3 +12,7 @@ print(arr.join(","));
 let str = "Hello, World!";
 
 print(str.length);
+
+for (let i = 0; i < str.length; i++) {
+    print(str.at(i));
+}

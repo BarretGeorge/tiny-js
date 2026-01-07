@@ -353,22 +353,61 @@ void Compiler::compileExpr(const std::shared_ptr<Expr>& expr)
     }
     else if (const auto this_expr = std::dynamic_pointer_cast<ThisExpr>(expr))
     {
-        // 就像访问普通变量一样，因为我们在 compileFunction 里把它加到了 locals[0]
-        // 这里的逻辑复用 Variable 的逻辑，或者直接 resolveLocal("this")
         compileExpr(std::make_shared<Variable>(this_expr->keyword));
-        // variable(this_expr->keyword, false);
     }
-    else if (auto get_expr = std::dynamic_pointer_cast<GetExpr>(expr))
+    else if (const auto get_expr = std::dynamic_pointer_cast<GetExpr>(expr))
     {
         compileExpr(get_expr->object);
         const int nameIdx = currentChunk()->addConstant(vm.newString(get_expr->name.lexeme));
         emitBytes(static_cast<uint8_t>(OpCode::OP_GET_PROPERTY), static_cast<uint8_t>(nameIdx));
     }
-    else if (auto set_expr = std::dynamic_pointer_cast<SetExpr>(expr))
+    else if (const auto set_expr = std::dynamic_pointer_cast<SetExpr>(expr))
     {
         compileExpr(set_expr->object);
         compileExpr(set_expr->value);
         const int nameIdx = currentChunk()->addConstant(vm.newString(set_expr->name.lexeme));
         emitBytes(static_cast<uint8_t>(OpCode::OP_SET_PROPERTY), static_cast<uint8_t>(nameIdx));
+    }
+    else if (const auto update = std::dynamic_pointer_cast<UpdateExpr>(expr))
+    {
+        int arg = resolveLocal(current, update->name.lexeme);
+        OpCode getOp, setOp;
+        int index = arg;
+
+        if (arg != -1)
+        {
+            getOp = OpCode::OP_GET_LOCAL;
+            setOp = OpCode::OP_SET_LOCAL;
+        }
+        else if ((arg = resolveUpvalue(current, update->name.lexeme)) != -1)
+        {
+            getOp = OpCode::OP_GET_UPVALUE;
+            setOp = OpCode::OP_SET_UPVALUE;
+            index = arg;
+        }
+        else
+        {
+            getOp = OpCode::OP_GET_GLOBAL;
+            setOp = OpCode::OP_SET_GLOBAL;
+            index = currentChunk()->addConstant(vm.newString(update->name.lexeme));
+        }
+
+        emitBytes(static_cast<uint8_t>(getOp), static_cast<uint8_t>(index));
+        emitBytes(static_cast<uint8_t>(OpCode::OP_CONSTANT),
+                  static_cast<uint8_t>(currentChunk()->addConstant(1.0)));
+
+        if (update->isIncrement) emitByte(static_cast<uint8_t>(OpCode::OP_ADD));
+        else emitByte(static_cast<uint8_t>(OpCode::OP_SUB));
+
+        emitBytes(static_cast<uint8_t>(setOp), static_cast<uint8_t>(index));
+
+        if (update->isPostfix)
+        {
+            emitBytes(static_cast<uint8_t>(OpCode::OP_CONSTANT),
+                      static_cast<uint8_t>(currentChunk()->addConstant(1.0)));
+
+            if (update->isIncrement) emitByte(static_cast<uint8_t>(OpCode::OP_SUB)); // i++: new - 1 = old
+            else emitByte(static_cast<uint8_t>(OpCode::OP_ADD)); // i--: new + 1 = old
+        }
     }
 }

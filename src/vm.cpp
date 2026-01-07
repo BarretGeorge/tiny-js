@@ -204,6 +204,12 @@ void VM::registerNative()
                      }
     );
 
+    bindNativeMethod(ObjType::LIST, "at", [this](auto argCount, auto args) -> Value
+                     {
+                         return nativeListAt(*this, argCount, args);
+                     }
+    );
+
     bindNativeMethod(ObjType::STRING, "length", [this](auto argCount, auto args) -> Value
                      {
                          return nativeStringLength(*this, argCount, args);
@@ -213,6 +219,12 @@ void VM::registerNative()
     bindNativeMethod(ObjType::STRING, "indexOf", [this](auto argCount, auto args) -> Value
                      {
                          return nativeStringIndexOf(*this, argCount, args);
+                     }
+    );
+
+    bindNativeMethod(ObjType::STRING, "at", [this](auto argCount, auto args) -> Value
+                     {
+                         return nativeStringAt(*this, argCount, args);
                      }
     );
 

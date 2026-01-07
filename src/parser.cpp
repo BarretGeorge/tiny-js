@@ -231,6 +231,19 @@ std::shared_ptr<Expr> Parser::factor()
 std::shared_ptr<Expr> Parser::unary()
 {
     if (match(TokenType::BANG) || match(TokenType::MINUS)) return std::make_shared<Unary>(previous(), unary());
+
+    if (match(TokenType::PLUS_PLUS) || match(TokenType::MINUS_MINUS))
+    {
+        const Token op = previous();
+        const auto right = primary();
+        if (const auto var = std::dynamic_pointer_cast<Variable>(right))
+        {
+            bool isInc = (op.type == TokenType::PLUS_PLUS);
+            return std::make_shared<UpdateExpr>(var->name, isInc, false);
+        }
+        throw std::runtime_error("Invalid target for prefix update.");
+    }
+
     return call();
 }
 
@@ -259,6 +272,19 @@ std::shared_ptr<Expr> Parser::call()
             auto index = expression();
             consume(TokenType::RIGHT_BRACKET, "Expect ']' after subscript.");
             e = std::make_shared<GetSubscriptExpr>(e, index);
+        }
+        else if (match(TokenType::PLUS_PLUS) || match(TokenType::MINUS_MINUS))
+        {
+            Token op = previous();
+            if (auto var = std::dynamic_pointer_cast<Variable>(e))
+            {
+                bool isInc = (op.type == TokenType::PLUS_PLUS);
+                e = std::make_shared<UpdateExpr>(var->name, isInc, true);
+            }
+            else
+            {
+                throw std::runtime_error("Invalid target for postfix update.");
+            }
         }
         else break;
     }

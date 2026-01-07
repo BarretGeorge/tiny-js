@@ -55,6 +55,10 @@ enum class TokenType
     LEFT_BRACKET,
     // 中括号 右
     RIGHT_BRACKET,
+    // ++
+    PLUS_PLUS,
+    // --
+    MINUS_MINUS,
     /** 关键字 开始 **/
     AND, CLASS, ELSE, FALSE, FUN, FOR, IF, NULLPTR, OR, RETURN, SUPER, THIS, TRUE, VAR, WHILE, CONST,
     /** 关键字 结束 **/
