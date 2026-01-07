@@ -38,7 +38,7 @@ Value nativeListClear(VM& vm, int argc, const Value* args)
     return std::monostate{};
 }
 
-Value nativeListPush(VM& vm, int argc, const Value* args)
+Value nativeListPush(VM& vm, const int argc, const Value* args)
 {
     const Value receiver = args[-1];
     auto* list = dynamic_cast<ObjList*>(std::get<Obj*>(receiver));
@@ -141,7 +141,15 @@ Value nativeStringToUpper(VM& vm, int argc, const Value* args)
     const Value receiver = args[-1];
     const auto* str = dynamic_cast<ObjString*>(std::get<Obj*>(receiver));
     std::string upperStr = str->chars;
-    std::ranges::transform(upperStr, upperStr.begin(), ::toupper);
+    std::transform(
+        upperStr.begin(),
+        upperStr.end(),
+        upperStr.begin(),
+        [](const unsigned char c)
+        {
+            return std::tolower(c);
+        }
+    );
     return Value{new ObjString(upperStr)};
 }
 
@@ -150,7 +158,15 @@ Value nativeStringToLower(VM& vm, int argc, const Value* args)
     const Value receiver = args[-1];
     const auto* str = dynamic_cast<ObjString*>(std::get<Obj*>(receiver));
     std::string lowerStr = str->chars;
-    std::ranges::transform(lowerStr, lowerStr.begin(), ::tolower);
+    std::transform(
+        lowerStr.begin(),
+        lowerStr.end(),
+        lowerStr.begin(),
+        [](const unsigned char c)
+        {
+            return std::tolower(c);
+        }
+    );
     return Value{new ObjString(lowerStr)};
 }
 

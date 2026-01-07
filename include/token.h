@@ -3,6 +3,7 @@
 
 #include <string>
 #include <variant>
+#include <memory>
 
 enum class TokenType
 {

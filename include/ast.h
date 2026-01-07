@@ -2,7 +2,7 @@
 #define TINY_JS_AST_H
 
 #include "token.h"
-#include <utility>
+#include <variant>
 #include <vector>
 
 struct Stmt;

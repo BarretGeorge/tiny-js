@@ -5,6 +5,9 @@
 #include <string>
 #include <sstream>
 #include <fstream>
+#include <cmath>
+#include <cstdint>
+#include <memory>
 
 struct Chunk;
 
