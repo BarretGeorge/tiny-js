@@ -49,14 +49,28 @@ void Scanner::scanToken(std::vector<Token>& t)
     case '.': addToken(t, TokenType::DOT);
         break;
     case '-':
-        addToken(t, match('-') ? TokenType::MINUS_MINUS : TokenType::MINUS);
+        if (match('-'))
+            addToken(t, TokenType::MINUS_MINUS);
+        else if (match('='))
+            addToken(t, TokenType::MINUS_EQUAL);
+        else
+            addToken(t, TokenType::MINUS);
         break;
     case '+':
-        addToken(t, match('+') ? TokenType::PLUS_PLUS : TokenType::PLUS);
+        if (match('+'))
+            addToken(t, TokenType::PLUS_PLUS);
+        else if (match('='))
+            addToken(t, TokenType::PLUS_EQUAL);
+        else
+            addToken(t, TokenType::PLUS);
         break;
     case ';': addToken(t, TokenType::SEMICOLON);
         break;
-    case '*': addToken(t, TokenType::STAR);
+    case '*':
+        if (match('='))
+            addToken(t, TokenType::STAR_EQUAL);
+        else
+            addToken(t, TokenType::STAR);
         break;
     case '!': addToken(t, match('=') ? TokenType::BANG_EQUAL : TokenType::BANG);
         break;
@@ -88,6 +102,10 @@ void Scanner::scanToken(std::vector<Token>& t)
             {
                 std::cerr << "[Line " << line << "] Error: Unterminated multi-line comment.\n";
             }
+        }
+        else if (match('='))
+        {
+            addToken(t, TokenType::SLASH_EQUAL);
         }
         else
         {

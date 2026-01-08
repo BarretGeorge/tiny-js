@@ -59,6 +59,18 @@ enum class TokenType
     PLUS_PLUS,
     // --
     MINUS_MINUS,
+    // +=
+    PLUS_EQUAL,
+    // -=
+    MINUS_EQUAL,
+    // *=
+    STAR_EQUAL,
+    // /=
+    SLASH_EQUAL,
+    // 逻辑与
+    AND_AND,
+    // 逻辑或
+    OR_OR,
     /** 关键字 开始 **/
     AND, CLASS, ELSE, FALSE, FUN, FOR, IF, NULLPTR, OR, RETURN, SUPER, THIS, TRUE, VAR, WHILE, CONST,
     /** 关键字 结束 **/

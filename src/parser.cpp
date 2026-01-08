@@ -190,8 +190,64 @@ std::shared_ptr<Expr> Parser::assignment()
         {
             return std::make_shared<SetSubscriptExpr>(sub->list, sub->index, v);
         }
-
         throw std::runtime_error("Invalid assignment target.");
+    }
+    if (match(TokenType::PLUS_EQUAL))
+    {
+        auto v = assignment();
+
+        if (const auto var = std::dynamic_pointer_cast<Variable>(e))
+        {
+            auto right = std::make_shared<Binary>(
+                e,
+                Token{TokenType::PLUS, "+", var->name.line, {}},
+                v
+            );
+            return std::make_shared<Assign>(var->name, right);
+        }
+        throw std::runtime_error("Invalid target for '+='.");
+    }
+    if (match(TokenType::MINUS_EQUAL))
+    {
+        auto v = assignment();
+        if (const auto var = std::dynamic_pointer_cast<Variable>(e))
+        {
+            auto right = std::make_shared<Binary>(
+                e,
+                Token{TokenType::PLUS, "-", var->name.line, {}},
+                v
+            );
+            return std::make_shared<Assign>(var->name, right);
+        }
+        throw std::runtime_error("Invalid target for '-='.");
+    }
+    if (match(TokenType::STAR_EQUAL))
+    {
+        auto v = assignment();
+        if (const auto var = std::dynamic_pointer_cast<Variable>(e))
+        {
+            auto right = std::make_shared<Binary>(
+                e,
+                Token{TokenType::STAR, "*", var->name.line, {}},
+                v
+            );
+            return std::make_shared<Assign>(var->name, right);
+        }
+        throw std::runtime_error("Invalid target for '*='.");
+    }
+    if (match(TokenType::SLASH_EQUAL))
+    {
+        auto v = assignment();
+        if (const auto var = std::dynamic_pointer_cast<Variable>(e))
+        {
+            auto right = std::make_shared<Binary>(
+                e,
+                Token{TokenType::SLASH, "/", var->name.line, {}},
+                v
+            );
+            return std::make_shared<Assign>(var->name, right);
+        }
+        throw std::runtime_error("Invalid target for '/='.");
     }
     return e;
 }
