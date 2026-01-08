@@ -41,6 +41,9 @@ public:
 
     JitCompiler jit;
 
+    // JIT 是否启用
+    bool jitEnabled{true};
+
     VM()
     {
         stack.reserve(2048);
@@ -96,6 +99,8 @@ public:
     void run();
 
     void runWithFile(const std::string& filename);
+
+    void enableJIT(const bool enable = true) { jitEnabled = enable; }
 
 private:
     void defineNative(const std::string& name, const NativeFn& fn);

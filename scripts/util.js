@@ -1,4 +1,4 @@
-print("Loading math.js...");
+println("Loading util.js...");
 
 const PI = 3.14159;
 

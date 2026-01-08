@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <memory>
 
+#define DEBUG
+
 struct Chunk;
 
 struct Obj;

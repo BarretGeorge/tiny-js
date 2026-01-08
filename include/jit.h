@@ -1,8 +1,11 @@
 #pragma once
+
+#include "debug.h"
 #include "object.h"
 #include <bit>
 #include <asmjit/asmjit.h>
 #include <iostream>
+#include "asmjit/arm/a64compiler.h"
 
 using namespace asmjit;
 
@@ -16,39 +19,42 @@ public:
 
     JitFn compile(Chunk* chunk)
     {
-        std::cout << "Attempting to JIT compile function with " << chunk->code.size() << " bytes of bytecode" << std::endl;
+        debug_log("开始 JIT 编译");
+        debug_log("字节码大小: {}", chunk->code.size());
+        debug_log("字节码内容:");
         for (int i = 0; i < chunk->code.size(); i++)
         {
-            std::cout << "  Offset " << i << ": " << static_cast<int>(chunk->code[i]) << std::endl;
+            debug_log("  Offset {}: {}", i, static_cast<int>(chunk->code[i]));
         }
 
         CodeHolder code;
         code.init(rt.environment());
 
         // 根据架构选择编译器
-        if (rt.environment().is_family_x86()) {
+        if (rt.environment().is_family_x86())
+        {
             return compileX86(chunk, code);
-        } else if (rt.environment().is_family_aarch64()) {
-            return compileAArch64(chunk, code);
-        } else {
-            std::cout << "Unsupported architecture for JIT compilation" << std::endl;
-            return nullptr;
         }
+        if (rt.environment().is_family_aarch64())
+        {
+            return compileAArch64(chunk, code);
+        }
+        std::cout << "Unsupported architecture for JIT compilation" << std::endl;
+        return nullptr;
     }
 
 private:
-    JitFn compileX86(Chunk* chunk, CodeHolder& code) {
+    JitFn compileX86(const Chunk* chunk, CodeHolder& code)
+    {
         x86::Compiler cc(&code);
 
-        // 开始定义函数
         FuncNode* func_node;
         Error err = cc.add_func_node(Out(func_node), FuncSignature::build<double, uint64_t>());
-        if (err != Error::kOk) {
+        if (err != Error::kOk)
+        {
             std::cout << "Failed to create FuncNode: " << DebugUtils::error_as_string(err) << std::endl;
             return nullptr;
         }
-
-        std::cout << "func_node: " << func_node << std::endl;
 
         // 获取参数 - 使用虚拟寄存器
         x86::Gp args = cc.new_gp64();
@@ -60,26 +66,23 @@ private:
 
         while (ip < chunk->code.size() && !jitFailed)
         {
-            uint8_t instruction = chunk->code[ip++];
-            std::cout << "Processing instruction: " << static_cast<int>(instruction) << std::endl;
+            const uint8_t instruction = chunk->code[ip++];
+            debug_log("处理指令: {}", static_cast<int>(instruction));
 
             switch (instruction)
             {
-            case (uint8_t)OpCode::OP_GET_LOCAL:
+            case static_cast<uint8_t>(OpCode::OP_GET_LOCAL):
                 {
-                    std::cout << "Processing OP_GET_LOCAL" << std::endl;
-                    uint8_t idx = chunk->code[ip++];
+                    const uint8_t idx = chunk->code[ip++];
                     x86::Vec xmm0 = cc.new_xmm();
-                    // args 是 double* 类型，索引 idx 的参数是 args[idx]
                     cc.movsd(xmm0, x86::ptr(args, idx * 8));
-                    // 压入到评估栈
                     cc.sub(x86::rsp, 8);
                     cc.movsd(x86::Mem(x86::rsp, 0), xmm0);
                     break;
                 }
-            case (uint8_t)OpCode::OP_ADD:
+            case static_cast<uint8_t>(OpCode::OP_ADD):
                 {
-                    std::cout << "Processing OP_ADD" << std::endl;
+                    debug_log("处理 OP_ADD");
                     x86::Vec xmm0 = cc.new_xmm();
                     x86::Vec xmm1 = cc.new_xmm();
                     // 从栈中弹出两个操作数
@@ -94,9 +97,9 @@ private:
                     cc.movsd(x86::Mem(x86::rsp, 0), xmm0);
                     break;
                 }
-            case (uint8_t)OpCode::OP_MUL:
+            case static_cast<uint8_t>(OpCode::OP_MUL):
                 {
-                    std::cout << "Processing OP_MUL" << std::endl;
+                    debug_log("处理 OP_MUL");
                     x86::Vec xmm0 = cc.new_xmm();
                     x86::Vec xmm1 = cc.new_xmm();
                     // 从栈中弹出两个操作数
@@ -111,10 +114,10 @@ private:
                     cc.movsd(x86::Mem(x86::rsp, 0), xmm0);
                     break;
                 }
-            case (uint8_t)OpCode::OP_RETURN:
+            case static_cast<uint8_t>(OpCode::OP_RETURN):
                 {
-                    std::cout << "Processing OP_RETURN" << std::endl;
-                    x86::Vec result = cc.new_xmm();
+                    debug_log("处理 OP_RETURN");
+                    const x86::Vec result = cc.new_xmm();
                     // 从栈中取出返回值
                     cc.movsd(result, x86::Mem(x86::rsp, 0));
                     cc.add(x86::rsp, 8);
@@ -124,7 +127,7 @@ private:
                 }
             default:
                 jitFailed = true;
-                std::cout << "Unsupported operation: " << static_cast<int>(instruction) << std::endl;
+                debug_log("不支持的操作: {}", static_cast<int>(instruction));
                 break;
             }
         }
@@ -132,20 +135,18 @@ private:
     finalize:
         if (jitFailed)
         {
-            std::cout << "JIT compilation failed due to unsupported operation" << std::endl;
+            debug_log("JIT 编译失败，遇到不支持的操作");
             return nullptr;
         }
 
-        // 结束函数定义
         cc.end_func();
 
-        std::cout << "Attempting to finalize JIT compilation" << std::endl;
         cc.finalize();
 
         // 检查 CodeHolder 是否包含任何代码
         if (code.sections().size() == 0 || code.sections()[0] == nullptr || code.sections()[0]->buffer_size() == 0)
         {
-            std::cout << "JIT compilation failed: No code generated" << std::endl;
+            debug_log("JIT 编译失败: 未生成代码");
             return nullptr;
         }
 
@@ -153,28 +154,29 @@ private:
         err = rt.add(&fn, &code);
         if (err != Error::kOk)
         {
-            std::cout << "JIT compilation failed during runtime registration: " << DebugUtils::error_as_string(err) << std::endl;
+            std::cout << "JIT compilation failed during runtime registration: " << DebugUtils::error_as_string(err) <<
+                std::endl;
             return nullptr;
         }
-        std::cout << "JIT compilation succeeded" << std::endl;
+        debug_log("JIT 编译完成");
         return fn;
     }
 
-    JitFn compileAArch64(Chunk* chunk, CodeHolder& code) {
+    JitFn compileAArch64(const Chunk* chunk, CodeHolder& code)
+    {
         a64::Compiler cc(&code);
 
         // 开始定义函数
         FuncNode* func_node;
         Error err = cc.add_func_node(Out(func_node), FuncSignature::build<double, uint64_t>());
-        if (err != Error::kOk) {
+        if (err != Error::kOk)
+        {
             std::cout << "Failed to create FuncNode: " << DebugUtils::error_as_string(err) << std::endl;
             return nullptr;
         }
 
-        std::cout << "func_node: " << func_node << std::endl;
-
         // 获取参数 - 使用虚拟寄存器
-        a64::Gp args = cc.new_gp64();
+        const a64::Gp args = cc.new_gp64();
         func_node->set_arg(0, args);
 
         // 处理字节码
@@ -183,71 +185,71 @@ private:
 
         while (ip < chunk->code.size() && !jitFailed)
         {
-            uint8_t instruction = chunk->code[ip++];
-            std::cout << "Processing instruction: " << static_cast<int>(instruction) << std::endl;
+            const uint8_t instruction = chunk->code[ip++];
 
+            debug_log("处理指令: {}", static_cast<int>(instruction));
             switch (instruction)
             {
-            case (uint8_t)OpCode::OP_GET_LOCAL:
+            case static_cast<uint8_t>(OpCode::OP_GET_LOCAL):
                 {
-                    std::cout << "Processing OP_GET_LOCAL" << std::endl;
-                    uint8_t idx = chunk->code[ip++];
+                    debug_log("处理 OP_GET_LOCAL");
+                    const uint8_t idx = chunk->code[ip++];
                     auto d0 = cc.new_vec_d();
                     // args 是 double* 类型，索引 idx 的参数是 args[idx]
                     cc.ldr(d0, a64::ptr(args, idx * 8));
                     // 压入到评估栈
-                    cc.sub(a64::regs::sp, 8);
+                    cc.sub(a64::regs::sp, a64::regs::sp, 8);
                     cc.str(d0, a64::ptr(a64::regs::sp, 0));
                     break;
                 }
-            case (uint8_t)OpCode::OP_ADD:
+            case static_cast<uint8_t>(OpCode::OP_ADD):
                 {
-                    std::cout << "Processing OP_ADD" << std::endl;
+                    debug_log("处理 OP_ADD");
                     auto d0 = cc.new_vec_d();
                     auto d1 = cc.new_vec_d();
                     // 从栈中弹出两个操作数
                     cc.ldr(d0, a64::ptr(a64::regs::sp, 0));
-                    cc.add(a64::regs::sp, 8);
+                    cc.add(a64::regs::sp, a64::regs::sp, 8);
                     cc.ldr(d1, a64::ptr(a64::regs::sp, 0));
-                    cc.add(a64::regs::sp, 8);
+                    cc.add(a64::regs::sp, a64::regs::sp, 8);
                     // 相加
                     cc.fadd(d0, d1, d0);
                     // 压回栈
-                    cc.sub(a64::regs::sp, 8);
+                    cc.sub(a64::regs::sp, a64::regs::sp, 8);
                     cc.str(d0, a64::ptr(a64::regs::sp, 0));
                     break;
                 }
-            case (uint8_t)OpCode::OP_MUL:
+            case static_cast<uint8_t>(OpCode::OP_MUL):
                 {
-                    std::cout << "Processing OP_MUL" << std::endl;
+                    debug_log("处理 OP_MUL");
                     auto d0 = cc.new_vec_d();
                     auto d1 = cc.new_vec_d();
                     // 从栈中弹出两个操作数
                     cc.ldr(d0, a64::ptr(a64::regs::sp, 0));
-                    cc.add(a64::regs::sp, 8);
+                    cc.add(a64::regs::sp, a64::regs::sp, 8);
                     cc.ldr(d1, a64::ptr(a64::regs::sp, 0));
-                    cc.add(a64::regs::sp, 8);
+                    cc.add(a64::regs::sp, a64::regs::sp, 8);
                     // 相乘
                     cc.fmul(d0, d1, d0);
                     // 压回栈
-                    cc.sub(a64::regs::sp, 8);
+                    cc.sub(a64::regs::sp, a64::regs::sp, 8);
                     cc.str(d0, a64::ptr(a64::regs::sp, 0));
                     break;
                 }
-            case (uint8_t)OpCode::OP_RETURN:
+            case static_cast<uint8_t>(OpCode::OP_RETURN):
                 {
-                    std::cout << "Processing OP_RETURN" << std::endl;
-                    auto result = cc.new_vec_d();
+                    debug_log("处理 OP_RETURN");
+                    const auto result = cc.new_vec_d();
                     // 从栈中取出返回值
                     cc.ldr(result, a64::ptr(a64::regs::sp, 0));
-                    cc.add(a64::regs::sp, 8);
+                    cc.add(a64::regs::sp, a64::regs::sp, 8);
                     // 返回结果
                     cc.ret(result);
                     goto finalize;
                 }
             default:
                 jitFailed = true;
-                std::cout << "Unsupported operation: " << static_cast<int>(instruction) << std::endl;
+                debug_log("不支持的操作: {}", static_cast<int>(instruction));
                 break;
             }
         }
@@ -255,20 +257,19 @@ private:
     finalize:
         if (jitFailed)
         {
-            std::cout << "JIT compilation failed due to unsupported operation" << std::endl;
+            debug_log("JIT 编译失败，遇到不支持的操作");
             return nullptr;
         }
 
         // 结束函数定义
         cc.end_func();
 
-        std::cout << "Attempting to finalize JIT compilation" << std::endl;
         cc.finalize();
 
         // 检查 CodeHolder 是否包含任何代码
         if (code.sections().size() == 0 || code.sections()[0] == nullptr || code.sections()[0]->buffer_size() == 0)
         {
-            std::cout << "JIT compilation failed: No code generated" << std::endl;
+            debug_log("JIT 编译失败: 未生成代码");
             return nullptr;
         }
 
@@ -276,10 +277,11 @@ private:
         err = rt.add(&fn, &code);
         if (err != Error::kOk)
         {
-            std::cout << "JIT compilation failed during runtime registration: " << DebugUtils::error_as_string(err) << std::endl;
+            std::cout << "JIT compilation failed during runtime registration: " << DebugUtils::error_as_string(err) <<
+                std::endl;
             return nullptr;
         }
-        std::cout << "JIT compilation succeeded" << std::endl;
+        debug_log("JIT 编译完成");
         return fn;
     }
 };

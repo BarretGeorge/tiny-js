@@ -1,4 +1,5 @@
 #include "vm.h"
+#include "debug.h"
 #include "scanner.h"
 #include "parser.h"
 #include "compiler.h"
@@ -536,26 +537,24 @@ void VM::run()
                 {
                     auto* cl = dynamic_cast<ObjClosure*>(std::get<Obj*>(callee));
 
-                    // 检查是否已经有 JIT 编译后的函数
-                    if (cl->function->jitFunction == nullptr)
+                    if (cl->function->jitFunction == nullptr && jitEnabled)
                     {
-                        // 尝试 JIT 编译
                         JitCompiler::JitFn jitFn = jit.compile(&cl->function->chunk);
                         if (jitFn != nullptr)
                         {
                             cl->function->jitFunction = reinterpret_cast<void*>(jitFn);
-                            std::cout << "JIT compiled function: " << cl->function->name << std::endl;
+                            debug_log("JIT开始编译函数{} ", cl->function->name);
                         }
                         else
                         {
-                            std::cout << "JIT compilation failed for function: " << cl->function->name << std::endl;
+                            debug_log("JIT编译函数{} 失败，回退到解释器", cl->function->name);
                         }
                     }
 
                     // 如果有 JIT 函数，执行 JIT 代码
-                    if (cl->function->jitFunction != nullptr)
+                    if (cl->function->jitFunction != nullptr && jitEnabled)
                     {
-                        std::cout << "Executing JIT function: " << cl->function->name << std::endl;
+                        debug_log("执行 JIT 函数 {} ", cl->function->name);
                         // 准备参数
                         double args[256]; // 假设最多 256 个参数
                         for (int i = 0; i < argc; ++i)
@@ -574,12 +573,12 @@ void VM::run()
                         }
 
                         // 调用 JIT 函数
-                        JitCompiler::JitFn jitFn = reinterpret_cast<JitCompiler::JitFn>(cl->function->jitFunction);
+                        auto jitFn = reinterpret_cast<JitCompiler::JitFn>(cl->function->jitFunction);
                         double result = jitFn(args);
 
                         // 处理返回值
                         stack.resize(calleeSlot);
-                        stack.push_back(result);
+                        stack.emplace_back(result);
                         frame = &frames.back();
                     }
                     else

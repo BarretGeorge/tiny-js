@@ -1,5 +1,5 @@
 #include "compiler.h"
-#include <iostream>
+#include "debug.h"
 
 Chunk* Compiler::currentChunk() const
 {
@@ -69,7 +69,7 @@ int Compiler::resolveUpvalue(CompilerState* s, std::string& n)
     return -1;
 }
 
-void Compiler::compileFunction(const std::shared_ptr<FunctionStmt>& s, bool isMethod)
+void Compiler::compileFunction(const std::shared_ptr<FunctionStmt>& s, const bool isMethod)
 {
     int gIdx = -1;
 
@@ -139,17 +139,6 @@ void Compiler::compileFunction(const std::shared_ptr<FunctionStmt>& s, bool isMe
     ObjFunction* f = current->function;
     const auto ups = current->upvalues;
 
-    // 打印函数的字节码
-    std::cout << "Compiled function: " << f->name << std::endl;
-    std::cout << "Bytecode size: " << f->chunk.code.size() << std::endl;
-    std::cout << "Constants: " << f->chunk.constants.size() << std::endl;
-    std::cout << "Bytecode: ";
-    for (uint8_t byte : f->chunk.code)
-    {
-        std::cout << static_cast<int>(byte) << " ";
-    }
-    std::cout << std::endl;
-
     vm.tempRoots.pop_back();
 
     current = current->enclosing;
@@ -182,17 +171,6 @@ ObjFunction* Compiler::compile(const std::vector<std::shared_ptr<Stmt>>& stmts)
     emitByte(static_cast<uint8_t>(OpCode::OP_NIL));
     emitByte(static_cast<uint8_t>(OpCode::OP_RETURN));
     ObjFunction* f = current->function;
-
-    // 打印字节码
-    std::cout << "Compiled function: " << f->name << std::endl;
-    std::cout << "Bytecode size: " << f->chunk.code.size() << std::endl;
-    std::cout << "Constants: " << f->chunk.constants.size() << std::endl;
-    std::cout << "Bytecode: ";
-    for (uint8_t byte : f->chunk.code)
-    {
-        std::cout << static_cast<int>(byte) << " ";
-    }
-    std::cout << std::endl;
 
     vm.tempRoots.pop_back();
     delete current;

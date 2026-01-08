@@ -21,6 +21,6 @@ println("divide(10, 2) = " + divide(10, 2));
 
 var sum = 0;
 for (var i = 0; i < 1000; i++) {
-    sum += add(i, i + 1);
+    sum += 1;
 }
 println("sum=" + sum);
