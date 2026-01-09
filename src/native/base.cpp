@@ -1,6 +1,7 @@
 #include "native/base.h"
 #include <iostream>
 #include <chrono>
+#include <thread>
 
 Value nativeNow(VM& vm, int argc, const Value* args)
 {
@@ -205,4 +206,79 @@ Value nativeStringTrim(VM& vm, int argc, const Value* args)
     }
     const size_t end = s.find_last_not_of(" \t\n\r");
     return vm.newString(s.substr(start, end - start + 1));
+}
+
+Value nativeSleep(VM& vm, const int argc, const Value* args)
+{
+    if (argc < 1 || !std::holds_alternative<double>(args[0]))
+    {
+        throw std::runtime_error("Sleep duration must be a number.");
+    }
+    const int durationMs = static_cast<int>(std::get<double>(args[0]));
+    std::this_thread::sleep_for(std::chrono::milliseconds(durationMs));
+    return std::monostate{};
+}
+
+Value nativeGetEnv(VM& vm, const int argc, const Value* args)
+{
+    if (argc < 1 || !std::holds_alternative<Obj*>(args[0]) ||
+        dynamic_cast<ObjString*>(std::get<Obj*>(args[0])) == nullptr)
+    {
+        throw std::runtime_error("Environment variable name must be a string.");
+    }
+    const auto* varName = dynamic_cast<ObjString*>(std::get<Obj*>(args[0]));
+    const char* value = std::getenv(varName->chars.c_str());
+    if (value == nullptr)
+    {
+        return vm.newString("");
+    }
+    return vm.newString(std::string(value));
+}
+
+Value nativeSetEnv(VM& vm, const int argc, const Value* args)
+{
+    if (argc < 2 ||
+        !std::holds_alternative<Obj*>(args[0]) ||
+        dynamic_cast<ObjString*>(std::get<Obj*>(args[0])) == nullptr ||
+        !std::holds_alternative<Obj*>(args[1]) ||
+        dynamic_cast<ObjString*>(std::get<Obj*>(args[1])) == nullptr)
+    {
+        throw std::runtime_error("Environment variable name and value must be strings.");
+    }
+    const auto* varName = dynamic_cast<ObjString*>(std::get<Obj*>(args[0]));
+    const auto* varValue = dynamic_cast<ObjString*>(std::get<Obj*>(args[1]));
+    if (setenv(varName->chars.c_str(), varValue->chars.c_str(), 1) != 0)
+    {
+        throw std::runtime_error("Failed to set environment variable.");
+    }
+    return std::monostate{};
+}
+
+Value nativeExit(VM& vm, const int argc, const Value* args)
+{
+    int exitCode = 0;
+    if (argc >= 1 && std::holds_alternative<double>(args[0]))
+    {
+        exitCode = static_cast<int>(std::get<double>(args[0]));
+    }
+    std::exit(exitCode);
+}
+
+Value nativeSetTimeout(VM& vm, int argc, const Value* args)
+{
+    if (argc < 2 || !isObjType(args[0], ObjType::CLOSURE) || !std::holds_alternative<double>(args[1]))
+    {
+        throw std::runtime_error("setTimeout requires a function and a delay in milliseconds.");
+    }
+    auto* callback = dynamic_cast<ObjClosure*>(std::get<Obj*>(args[0]));
+    const int delayMs = static_cast<int>(std::get<double>(args[1]));
+
+    // 在新线程中等待指定时间后调用回调函数
+    std::thread([callback, delayMs, &vm]()
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
+        vm.callAndRun(callback);
+    }).detach();
+
+    return std::monostate{};
 }

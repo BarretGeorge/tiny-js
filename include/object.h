@@ -117,9 +117,11 @@ enum class OpCode : uint8_t
     OP_SET_PROPERTY,
     // 方法定义
     OP_METHOD,
+    // 三元运算符
+    OP_TERNARY,
 };
 
-static constexpr std::array<std::string_view, 37> opCodeNames = {
+static constexpr std::array<std::string_view, 38> opCodeNames = {
     "OP_CONSTANT",
     "OP_NIL",
     "OP_TRUE",
@@ -156,7 +158,8 @@ static constexpr std::array<std::string_view, 37> opCodeNames = {
     "OP_CLASS",
     "OP_GET_PROPERTY",
     "OP_SET_PROPERTY",
-    "OP_METHOD"
+    "OP_METHOD",
+    "OP_TERNARY"
 };
 
 struct Obj

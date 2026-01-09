@@ -76,6 +76,9 @@ private:
     // 解析表达式
     std::shared_ptr<Expr> expression();
 
+    // 解析条件表达式（三元运算符）
+    std::shared_ptr<Expr> conditional();
+
     // 解析赋值表达式
     std::shared_ptr<Expr> assignment();
 

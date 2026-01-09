@@ -283,6 +283,29 @@ void Compiler::compileExpr(const std::shared_ptr<Expr>& expr)
                     : static_cast<uint8_t>(OpCode::OP_FALSE));
         else emitByte(static_cast<uint8_t>(OpCode::OP_NIL));
     }
+    else if (const auto ternary = std::dynamic_pointer_cast<Ternary>(expr))
+    {
+        // 编译条件表达式
+        compileExpr(ternary->condition);
+
+        // 条件跳转：如果条件为false，跳转到else部分
+        int elseJump = emitJump(OpCode::OP_JUMP_IF_FALSE);
+
+        // 编译then部分
+        compileExpr(ternary->thenExpr);
+
+        // 无条件跳转到endif
+        int endifJump = emitJump(OpCode::OP_JUMP);
+
+        // 修复else跳转地址
+        patchJump(elseJump);
+
+        // 编译else部分
+        compileExpr(ternary->elseExpr);
+
+        // 修复endif跳转地址
+        patchJump(endifJump);
+    }
     else if (const auto binary = std::dynamic_pointer_cast<Binary>(expr))
     {
         compileExpr(binary->left);
@@ -294,7 +317,19 @@ void Compiler::compileExpr(const std::shared_ptr<Expr>& expr)
         else if (t == TokenType::PERCENT) emitByte(static_cast<uint8_t>(OpCode::OP_MOD));
         else if (t == TokenType::EQUAL_EQUAL) emitByte(static_cast<uint8_t>(OpCode::OP_EQUAL));
         else if (t == TokenType::LESS) emitByte(static_cast<uint8_t>(OpCode::OP_LESS));
+        else if (t == TokenType::LESS_EQUAL)
+        {
+            compileExpr(binary->right);
+            compileExpr(binary->left);
+            emitByte(static_cast<uint8_t>(OpCode::OP_GREATER));
+        }
         else if (t == TokenType::GREATER) emitByte(static_cast<uint8_t>(OpCode::OP_GREATER));
+        else if (t == TokenType::GREATER_EQUAL)
+        {
+            compileExpr(binary->right);
+            compileExpr(binary->left);
+            emitByte(static_cast<uint8_t>(OpCode::OP_LESS));
+        }
     }
     else if (const auto variable = std::dynamic_pointer_cast<Variable>(expr))
     {

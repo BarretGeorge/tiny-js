@@ -33,6 +33,10 @@ enum class TokenType
     PERCENT,
     // 百分号等于
     PERCENT_EQUAL,
+    // 问号 (三元运算符)
+    QUESTION,
+    // 冒号 (三元运算符)
+    COLON,
     // 感叹号
     BANG,
     // 等于号

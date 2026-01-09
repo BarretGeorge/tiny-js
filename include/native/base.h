@@ -35,4 +35,14 @@ Value nativeStringToLower(VM& vm, int argc, const Value* args);
 
 Value nativeStringTrim(VM& vm, int argc, const Value* args);
 
+Value nativeSleep(VM& vm, int argc, const Value* args);
+
+Value nativeGetEnv(VM& vm, int argc, const Value* args);
+
+Value nativeSetEnv(VM& vm, int argc, const Value* args);
+
+Value nativeExit(VM& vm, int argc, const Value* args);
+
+Value nativeSetTimeout(VM& vm, int argc, const Value* args);
+
 #endif //TINY_JS_BASE_H

@@ -46,7 +46,7 @@ Token Parser::previous()
 Token Parser::consume(const TokenType t, const std::string& m)
 {
     if (check(t)) return advance();
-    const Token wrongToken = peek();
+    const Token wrongToken = previous();
     const std::string message = "[" + filename + ":" + std::to_string(wrongToken.line) + "] Error: " + m;
     throw std::runtime_error(message);
 }
@@ -170,7 +170,20 @@ std::shared_ptr<Stmt> Parser::returnStmt()
 
 std::shared_ptr<Expr> Parser::expression()
 {
-    return assignment();
+    return conditional();
+}
+
+std::shared_ptr<Expr> Parser::conditional()
+{
+    auto e = assignment();
+    if (match(TokenType::QUESTION))
+    {
+        auto thenExpr = assignment(); // 三元运算符的then部分可以是任意表达式
+        consume(TokenType::COLON, "Expect ':' after then part of conditional expression.");
+        auto elseExpr = conditional(); // 三元运算符的else部分可以是另一个条件表达式（支持嵌套）
+        return std::make_shared<Ternary>(e, thenExpr, elseExpr);
+    }
+    return e;
 }
 
 std::shared_ptr<Expr> Parser::assignment()
@@ -273,7 +286,7 @@ std::shared_ptr<Expr> Parser::equality()
     auto e = comparison();
     while (match(TokenType::BANG_EQUAL) || match(TokenType::EQUAL_EQUAL))
     {
-        Token op = previous();  // Save operator token BEFORE calling comparison()
+        Token op = previous(); // Save operator token BEFORE calling comparison()
         e = std::make_shared<Binary>(e, op, comparison());
     }
     return e;
@@ -283,8 +296,9 @@ std::shared_ptr<Expr> Parser::comparison()
 {
     auto e = term();
     while (match(TokenType::GREATER) || match(TokenType::GREATER_EQUAL) || match(TokenType::LESS) ||
-        match(TokenType::LESS_EQUAL)) {
-        Token op = previous();  // Save operator token BEFORE calling term()
+        match(TokenType::LESS_EQUAL))
+    {
+        Token op = previous(); // Save operator token BEFORE calling term()
         e = std::make_shared<Binary>(e, op, term());
     }
     return e;
@@ -295,7 +309,7 @@ std::shared_ptr<Expr> Parser::term()
     auto e = factor();
     while (match(TokenType::MINUS) || match(TokenType::PLUS))
     {
-        Token op = previous();  // Save operator token BEFORE calling factor()
+        Token op = previous(); // Save operator token BEFORE calling factor()
         e = std::make_shared<Binary>(e, op, factor());
     }
     return e;
@@ -306,7 +320,7 @@ std::shared_ptr<Expr> Parser::factor()
     auto e = unary();
     while (match(TokenType::SLASH) || match(TokenType::STAR) || match(TokenType::PERCENT))
     {
-        Token op = previous();  // Save operator token BEFORE calling unary()
+        Token op = previous(); // Save operator token BEFORE calling unary()
         e = std::make_shared<Binary>(e, op, unary());
     }
     return e;
@@ -404,7 +418,8 @@ std::shared_ptr<Expr> Parser::primary()
         consume(TokenType::RIGHT_BRACKET, "Expect ']' after list.");
         return std::make_shared<ListExpr>(elements);
     }
-    throw std::runtime_error("Expect expression.");
+    const auto prev = previous();
+    throw std::runtime_error("[" + filename + ":" + std::to_string(prev.line) + "] Error: Expect expression.");
 }
 
 std::shared_ptr<Stmt> Parser::classDeclaration()

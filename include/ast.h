@@ -247,6 +247,18 @@ struct SetExpr : Expr
     }
 };
 
+// 三元表达式: condition ? thenExpr : elseExpr
+struct Ternary : Expr
+{
+    std::shared_ptr<Expr> condition;
+    std::shared_ptr<Expr> thenExpr;
+    std::shared_ptr<Expr> elseExpr;
+
+    Ternary(auto c, auto t, auto e) : condition(c), thenExpr(t), elseExpr(e)
+    {
+    }
+};
+
 // Class 声明语句
 struct ClassStmt : Stmt
 {

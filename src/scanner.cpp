@@ -64,6 +64,10 @@ void Scanner::scanToken(std::vector<Token>& t)
         else
             addToken(t, TokenType::PLUS);
         break;
+    case '?': addToken(t, TokenType::QUESTION);
+        break;
+    case ':': addToken(t, TokenType::COLON);
+        break;
     case '%':
         if (match('='))
             addToken(t, TokenType::PERCENT_EQUAL);

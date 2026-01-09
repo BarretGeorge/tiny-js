@@ -10,11 +10,11 @@
 
 void VM::initModule()
 {
-    this->compilerHook = [&](const std::string& source,const std::string& filename) -> ObjFunction*
+    this->compilerHook = [&](const std::string& source, const std::string& filename) -> ObjFunction*
     {
         Scanner scanner(source);
         const auto tokens = scanner.scanTokens();
-        Parser parser(tokens,filename);
+        Parser parser(tokens, filename);
         try
         {
             const auto stmts = parser.parse();
@@ -202,6 +202,26 @@ void VM::registerNative()
     defineNative("require", [this](auto argc, auto args) -> Value
     {
         return nativeRequire(*this, argc, args);
+    });
+
+    defineNative("sleep", [this](auto argc, auto args) -> Value
+    {
+        return nativeSleep(*this, argc, args);
+    });
+
+    defineNative("getEnv", [this](auto argc, auto args) -> Value
+    {
+        return nativeGetEnv(*this, argc, args);
+    });
+
+    defineNative("setEnv", [this](auto argc, auto args) -> Value
+    {
+        return nativeSetEnv(*this, argc, args);
+    });
+
+    defineNative("setTimeout", [this](auto argc, auto args) -> Value
+    {
+        return nativeSetTimeout(*this, argc, args);
     });
 
     bindNativeMethod(ObjType::LIST, "clear", [this](auto argCount, auto args) -> Value
@@ -532,7 +552,7 @@ void VM::run()
         case OpCode::OP_LOOP:
             {
                 uint16_t o = (frame->ip[0] << 8) | frame->ip[1];
-                frame->ip = frame->ip + 2 - o;  // 修正跳转计算
+                frame->ip = frame->ip + 2 - o; // 修正跳转计算
                 break;
             }
 
