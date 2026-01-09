@@ -175,13 +175,35 @@ std::shared_ptr<Expr> Parser::expression()
 
 std::shared_ptr<Expr> Parser::conditional()
 {
-    auto e = assignment();
+    auto e = logicalOr();
     if (match(TokenType::QUESTION))
     {
         auto thenExpr = assignment(); // 三元运算符的then部分可以是任意表达式
         consume(TokenType::COLON, "Expect ':' after then part of conditional expression.");
         auto elseExpr = conditional(); // 三元运算符的else部分可以是另一个条件表达式（支持嵌套）
         return std::make_shared<Ternary>(e, thenExpr, elseExpr);
+    }
+    return e;
+}
+
+std::shared_ptr<Expr> Parser::logicalOr()
+{
+    auto e = logicalAnd();
+    while (match(TokenType::OR_OR))
+    {
+        Token op = previous();
+        e = std::make_shared<Binary>(e, op, logicalAnd());
+    }
+    return e;
+}
+
+std::shared_ptr<Expr> Parser::logicalAnd()
+{
+    auto e = equality();
+    while (match(TokenType::AND_AND))
+    {
+        Token op = previous();
+        e = std::make_shared<Binary>(e, op, equality());
     }
     return e;
 }
@@ -286,7 +308,7 @@ std::shared_ptr<Expr> Parser::equality()
     auto e = comparison();
     while (match(TokenType::BANG_EQUAL) || match(TokenType::EQUAL_EQUAL))
     {
-        Token op = previous(); // Save operator token BEFORE calling comparison()
+        Token op = previous();
         e = std::make_shared<Binary>(e, op, comparison());
     }
     return e;
@@ -298,7 +320,7 @@ std::shared_ptr<Expr> Parser::comparison()
     while (match(TokenType::GREATER) || match(TokenType::GREATER_EQUAL) || match(TokenType::LESS) ||
         match(TokenType::LESS_EQUAL))
     {
-        Token op = previous(); // Save operator token BEFORE calling term()
+        Token op = previous();
         e = std::make_shared<Binary>(e, op, term());
     }
     return e;
@@ -309,7 +331,7 @@ std::shared_ptr<Expr> Parser::term()
     auto e = factor();
     while (match(TokenType::MINUS) || match(TokenType::PLUS))
     {
-        Token op = previous(); // Save operator token BEFORE calling factor()
+        Token op = previous();
         e = std::make_shared<Binary>(e, op, factor());
     }
     return e;

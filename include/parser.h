@@ -79,6 +79,12 @@ private:
     // 解析条件表达式（三元运算符）
     std::shared_ptr<Expr> conditional();
 
+    // 解析逻辑或表达式（||）
+    std::shared_ptr<Expr> logicalOr();
+
+    // 解析逻辑与表达式（&&）
+    std::shared_ptr<Expr> logicalAnd();
+
     // 解析赋值表达式
     std::shared_ptr<Expr> assignment();
 

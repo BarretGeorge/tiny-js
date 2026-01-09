@@ -216,11 +216,9 @@ void Compiler::compileStmt(const std::shared_ptr<Stmt>& stmt)
     {
         compileExpr(if_stmt->condition);
         const int tj = emitJump(OpCode::OP_JUMP_IF_FALSE);
-        emitByte(static_cast<uint8_t>(OpCode::OP_POP));
         compileStmt(if_stmt->thenBranch);
         const int ej = emitJump(OpCode::OP_JUMP);
         patchJump(tj);
-        emitByte(static_cast<uint8_t>(OpCode::OP_POP));
         if (if_stmt->elseBranch) compileStmt(if_stmt->elseBranch);
         patchJump(ej);
     }
@@ -229,11 +227,9 @@ void Compiler::compileStmt(const std::shared_ptr<Stmt>& stmt)
         const size_t ls = currentChunk()->code.size();
         compileExpr(while_stmt->condition);
         const int ej = emitJump(OpCode::OP_JUMP_IF_FALSE);
-        emitByte(static_cast<uint8_t>(OpCode::OP_POP));
         compileStmt(while_stmt->body);
         emitLoop(static_cast<int>(ls));
         patchJump(ej);
-        emitByte(static_cast<uint8_t>(OpCode::OP_POP));
     }
     else if (const auto function_stmt = std::dynamic_pointer_cast<FunctionStmt>(stmt))
     {
@@ -285,25 +281,12 @@ void Compiler::compileExpr(const std::shared_ptr<Expr>& expr)
     }
     else if (const auto ternary = std::dynamic_pointer_cast<Ternary>(expr))
     {
-        // 编译条件表达式
         compileExpr(ternary->condition);
-
-        // 条件跳转：如果条件为false，跳转到else部分
-        int elseJump = emitJump(OpCode::OP_JUMP_IF_FALSE);
-
-        // 编译then部分
+        const int elseJump = emitJump(OpCode::OP_JUMP_IF_FALSE);
         compileExpr(ternary->thenExpr);
-
-        // 无条件跳转到endif
-        int endifJump = emitJump(OpCode::OP_JUMP);
-
-        // 修复else跳转地址
+        const int endifJump = emitJump(OpCode::OP_JUMP);
         patchJump(elseJump);
-
-        // 编译else部分
         compileExpr(ternary->elseExpr);
-
-        // 修复endif跳转地址
         patchJump(endifJump);
     }
     else if (const auto binary = std::dynamic_pointer_cast<Binary>(expr))
@@ -329,6 +312,22 @@ void Compiler::compileExpr(const std::shared_ptr<Expr>& expr)
             compileExpr(binary->right);
             compileExpr(binary->left);
             emitByte(static_cast<uint8_t>(OpCode::OP_LESS));
+        }
+        else if (t == TokenType::AND_AND)
+        {
+            compileExpr(binary->left);
+            const int falseJump = emitJump(OpCode::OP_JUMP_IF_FALSE);
+            emitByte(static_cast<uint8_t>(OpCode::OP_POP));
+            compileExpr(binary->right);
+            patchJump(falseJump);
+        }
+        else if (t == TokenType::OR_OR)
+        {
+            compileExpr(binary->left);
+            const int trueJump = emitJump(OpCode::OP_JUMP_IF_TRUE);
+            emitByte(static_cast<uint8_t>(OpCode::OP_POP));
+            compileExpr(binary->right);
+            patchJump(trueJump);
         }
     }
     else if (const auto variable = std::dynamic_pointer_cast<Variable>(expr))

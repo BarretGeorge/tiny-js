@@ -89,8 +89,10 @@ enum class OpCode : uint8_t
     OP_NEGATE,
     // 无条件跳转
     OP_JUMP,
-    // 条件跳转
+    // 条件跳转（为假时跳转）
     OP_JUMP_IF_FALSE,
+    // 条件跳转（为真时跳转）
+    OP_JUMP_IF_TRUE,
     // 循环跳转
     OP_LOOP,
     // 函数调用
@@ -119,9 +121,13 @@ enum class OpCode : uint8_t
     OP_METHOD,
     // 三元运算符
     OP_TERNARY,
+    // 逻辑与
+    OP_AND,
+    // 逻辑或
+    OP_OR,
 };
 
-static constexpr std::array<std::string_view, 38> opCodeNames = {
+static constexpr std::array<std::string_view, 41> opCodeNames = {
     "OP_CONSTANT",
     "OP_NIL",
     "OP_TRUE",
@@ -146,6 +152,7 @@ static constexpr std::array<std::string_view, 38> opCodeNames = {
     "OP_NEGATE",
     "OP_JUMP",
     "OP_JUMP_IF_FALSE",
+    "OP_JUMP_IF_TRUE",
     "OP_LOOP",
     "OP_CALL",
     "OP_CLOSURE",
@@ -159,7 +166,9 @@ static constexpr std::array<std::string_view, 38> opCodeNames = {
     "OP_GET_PROPERTY",
     "OP_SET_PROPERTY",
     "OP_METHOD",
-    "OP_TERNARY"
+    "OP_TERNARY",
+    "OP_AND",
+    "OP_OR"
 };
 
 struct Obj

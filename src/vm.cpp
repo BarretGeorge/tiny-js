@@ -8,6 +8,17 @@
 #include "native/file.h"
 #include <iostream>
 
+bool toBool(const Value value)
+{
+    if (std::holds_alternative<std::monostate>(value))
+        return false;
+    if (std::holds_alternative<bool>(value))
+        return std::get<bool>(value);
+    if (std::holds_alternative<double>(value))
+        return std::get<double>(value) != 0;
+    return true;
+}
+
 void VM::initModule()
 {
     this->compilerHook = [&](const std::string& source, const std::string& filename) -> ObjFunction*
@@ -462,6 +473,24 @@ void VM::run()
                 stack.emplace_back(a == b);
                 break;
             }
+        case OpCode::OP_AND:
+            {
+                bool b = toBool(stack.back());
+                stack.pop_back();
+                bool a = toBool(stack.back());
+                stack.pop_back();
+                stack.emplace_back(a && b);
+                break;
+            }
+        case OpCode::OP_OR:
+            {
+                bool b = toBool(stack.back());
+                stack.pop_back();
+                bool a = toBool(stack.back());
+                stack.pop_back();
+                stack.emplace_back(a || b);
+                break;
+            }
         case OpCode::OP_GREATER:
             {
                 double b = std::get<double>(stack.back());
@@ -497,6 +526,13 @@ void VM::run()
                 {
                     stack.emplace_back(std::get<double>(a) + std::get<double>(b));
                 }
+                else if (std::holds_alternative<bool>(a) || std::holds_alternative<bool>(b))
+                {
+                    // 布尔类型转换为字符串进行拼接
+                    std::string sa = valToString(a);
+                    std::string sb = valToString(b);
+                    stack.emplace_back(newString(sa + sb));
+                }
                 else
                 {
                     runtimeError("Operands must be two numbers or two strings.");
@@ -508,28 +544,36 @@ void VM::run()
             {
                 double b = std::get<double>(stack.back());
                 stack.pop_back();
-                stack.emplace_back(std::get<double>(stack.back()) - b);
+                double a = std::get<double>(stack.back());
+                stack.pop_back();
+                stack.emplace_back(a - b);
                 break;
             }
         case OpCode::OP_MUL:
             {
                 double b = std::get<double>(stack.back());
                 stack.pop_back();
-                stack.emplace_back(std::get<double>(stack.back()) * b);
+                double a = std::get<double>(stack.back());
+                stack.pop_back();
+                stack.emplace_back(a * b);
                 break;
             }
         case OpCode::OP_DIV:
             {
                 double b = std::get<double>(stack.back());
                 stack.pop_back();
-                stack.emplace_back(std::get<double>(stack.back()) / b);
+                double a = std::get<double>(stack.back());
+                stack.pop_back();
+                stack.emplace_back(a / b);
                 break;
             }
         case OpCode::OP_MOD:
             {
                 double b = std::get<double>(stack.back());
                 stack.pop_back();
-                stack.emplace_back(fmod(std::get<double>(stack.back()), b));
+                double a = std::get<double>(stack.back());
+                stack.pop_back();
+                stack.emplace_back(fmod(a, b));
                 break;
             }
 
@@ -544,8 +588,18 @@ void VM::run()
                 uint16_t o = (frame->ip[0] << 8) | frame->ip[1];
                 frame->ip += 2;
                 Value v = stack.back();
-                if (std::holds_alternative<std::monostate>(v) || (std::holds_alternative<bool>(v) && !std::get<
-                    bool>(v)))
+                stack.pop_back(); // 弹出值
+                if (!toBool(v))
+                    frame->ip += o;
+                break;
+            }
+        case OpCode::OP_JUMP_IF_TRUE:
+            {
+                uint16_t o = (frame->ip[0] << 8) | frame->ip[1];
+                frame->ip += 2;
+                Value v = stack.back();
+                stack.pop_back(); // 弹出值
+                if (toBool(v))
                     frame->ip += o;
                 break;
             }

@@ -86,6 +86,18 @@ void Scanner::scanToken(std::vector<Token>& t)
         break;
     case '=': addToken(t, match('=') ? TokenType::EQUAL_EQUAL : TokenType::EQUAL);
         break;
+    case '|':
+        if (match('|'))
+            addToken(t, TokenType::OR_OR);
+        else
+            addToken(t, TokenType::OR);
+        break;
+    case '&':
+        if (match('&'))
+            addToken(t, TokenType::AND_AND);
+        else
+            addToken(t, TokenType::AND);
+        break;
     case '<': addToken(t, match('=') ? TokenType::LESS_EQUAL : TokenType::LESS);
         break;
     case '>': addToken(t, match('=') ? TokenType::GREATER_EQUAL : TokenType::GREATER);
