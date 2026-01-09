@@ -14,5 +14,6 @@ let str = "Hello, World!";
 println(str.length);
 
 for (let i = 0; i < str.length; i++) {
-    print(str.at(i));
+    println("i=", i);
+    println(str.at(i));
 }

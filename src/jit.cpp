@@ -1,12 +1,8 @@
 #include "jit.h"
 #include "debug.h"
 #include <iostream>
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386) || defined(_M_IX86)
 #include "asmjit/x86/x86compiler.h"
-#endif
-#if defined(__aarch64__) || defined(_M_ARM64)
 #include "asmjit/arm/a64compiler.h"
-#endif
 
 JitCompiler::JitFn JitCompiler::compile(const Chunk* chunk)
 {

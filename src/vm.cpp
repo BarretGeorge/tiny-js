@@ -525,7 +525,7 @@ void VM::run()
         case OpCode::OP_LOOP:
             {
                 uint16_t o = (frame->ip[0] << 8) | frame->ip[1];
-                frame->ip -= (o - 2);
+                frame->ip = frame->ip + 2 - o;  // 修正跳转计算
                 break;
             }
 
