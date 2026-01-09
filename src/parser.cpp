@@ -256,8 +256,10 @@ std::shared_ptr<Expr> Parser::equality()
 {
     auto e = comparison();
     while (match(TokenType::BANG_EQUAL) || match(TokenType::EQUAL_EQUAL))
-        e = std::make_shared<Binary>(
-            e, previous(), comparison());
+    {
+        Token op = previous();  // Save operator token BEFORE calling comparison()
+        e = std::make_shared<Binary>(e, op, comparison());
+    }
     return e;
 }
 
@@ -265,22 +267,32 @@ std::shared_ptr<Expr> Parser::comparison()
 {
     auto e = term();
     while (match(TokenType::GREATER) || match(TokenType::GREATER_EQUAL) || match(TokenType::LESS) ||
-        match(TokenType::LESS_EQUAL))
-        e = std::make_shared<Binary>(e, previous(), term());
+        match(TokenType::LESS_EQUAL)) {
+        Token op = previous();  // Save operator token BEFORE calling term()
+        e = std::make_shared<Binary>(e, op, term());
+    }
     return e;
 }
 
 std::shared_ptr<Expr> Parser::term()
 {
     auto e = factor();
-    while (match(TokenType::MINUS) || match(TokenType::PLUS)) e = std::make_shared<Binary>(e, previous(), factor());
+    while (match(TokenType::MINUS) || match(TokenType::PLUS))
+    {
+        Token op = previous();  // Save operator token BEFORE calling factor()
+        e = std::make_shared<Binary>(e, op, factor());
+    }
     return e;
 }
 
 std::shared_ptr<Expr> Parser::factor()
 {
     auto e = unary();
-    while (match(TokenType::SLASH) || match(TokenType::STAR)) e = std::make_shared<Binary>(e, previous(), unary());
+    while (match(TokenType::SLASH) || match(TokenType::STAR))
+    {
+        Token op = previous();  // Save operator token BEFORE calling unary()
+        e = std::make_shared<Binary>(e, op, unary());
+    }
     return e;
 }
 
