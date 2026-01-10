@@ -214,7 +214,6 @@ void Compiler::compileStmt(const std::shared_ptr<Stmt>& stmt)
 
             if (var_stmt->isConst)
             {
-                // const 变量：直接用初始化值定义，不需要预声明
                 if (var_stmt->initializer)
                 {
                     compileExpr(var_stmt->initializer);
@@ -227,7 +226,6 @@ void Compiler::compileStmt(const std::shared_ptr<Stmt>& stmt)
             }
             else
             {
-                // var 变量：先预声明为 undefined，这样闭包可以引用它，然后再赋值
                 emitByte(static_cast<uint8_t>(OpCode::OP_NIL));
                 emitBytes(static_cast<uint8_t>(OpCode::OP_DEFINE_GLOBAL), static_cast<uint8_t>(i));
 
@@ -299,16 +297,9 @@ void Compiler::compileStmt(const std::shared_ptr<Stmt>& stmt)
     }
     else if (const auto import_stmt = std::dynamic_pointer_cast<ImportStmt>(stmt))
     {
-        // import { add, PI } from "util.js"
-        // 编译为: require("util.js") 返回 exports 对象
-        // 然后从 exports 对象中提取每个属性并定义为全局变量
-
-        // 1. 调用 require 函数
-        // 注意：OP_CALL 期望栈布局为 [..., callee, arg1, arg2, ...]
-        // calleeSlot = stack.size() - 1 - argc，所以被调用者在参数之前压入
         const int requireIdx = currentChunk()->addConstant(vm.newString("require"));
 
-        // 先压入被调用者（require函数）
+        // 先压入被调用者
         emitBytes(static_cast<uint8_t>(OpCode::OP_GET_GLOBAL), static_cast<uint8_t>(requireIdx));
 
         // 再压入参数（模块路径）
@@ -401,9 +392,11 @@ void Compiler::compileExpr(const std::shared_ptr<Expr>& expr)
     {
         compileExpr(ternary->condition);
         const int elseJump = emitJump(OpCode::OP_JUMP_IF_FALSE);
+        emitByte(static_cast<uint8_t>(OpCode::OP_POP));
         compileExpr(ternary->thenExpr);
         const int endifJump = emitJump(OpCode::OP_JUMP);
         patchJump(elseJump);
+        emitByte(static_cast<uint8_t>(OpCode::OP_POP));
         compileExpr(ternary->elseExpr);
         patchJump(endifJump);
     }

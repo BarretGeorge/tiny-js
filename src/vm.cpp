@@ -632,7 +632,7 @@ void VM::run()
                 uint16_t o = (frame->ip[0] << 8) | frame->ip[1];
                 frame->ip += 2;
                 Value v = stack.back();
-                stack.pop_back(); // 弹出值
+                // stack.pop_back(); // 弹出值
                 if (!toBool(v))
                     frame->ip += o;
                 break;
@@ -642,7 +642,7 @@ void VM::run()
                 uint16_t o = (frame->ip[0] << 8) | frame->ip[1];
                 frame->ip += 2;
                 Value v = stack.back();
-                stack.pop_back(); // 弹出值
+                // stack.pop_back(); // 弹出值
                 if (toBool(v))
                     frame->ip += o;
                 break;
@@ -720,9 +720,21 @@ void VM::run()
                         }
 
                         // 处理返回值
-                        stack.resize(calleeSlot);
+                        if (calleeSlot < 0 || static_cast<size_t>(calleeSlot) > stack.size())
+                        {
+                            frames.push_back({cl, cl->function->chunk.code.data(), calleeSlot});
+                            frame = &frames.back();
+                            goto call_end;
+                        }
+                        if (static_cast<size_t>(calleeSlot) > stack.size())
+                        {
+                            stack.clear();
+                        }
+                        else
+                        {
+                            stack.resize(calleeSlot);
+                        }
                         stack.emplace_back(result);
-                        frame = &frames.back();
                         debug_log("JIT函数{}调用成功", cl->function->name);
                     }
                     else
@@ -738,7 +750,14 @@ void VM::run()
                     Value* args = &stack[calleeSlot + 1];
                     Value res = n->function(argc, args);
 
-                    stack.resize(calleeSlot);
+                    if (calleeSlot < 0 || static_cast<size_t>(calleeSlot) > stack.size())
+                    {
+                        stack.clear();
+                    }
+                    else
+                    {
+                        stack.resize(calleeSlot);
+                    }
                     stack.push_back(res);
 
                     frame = &frames.back();
@@ -766,7 +785,14 @@ void VM::run()
                         // 调用原生 init，args[-1] 是刚创建的 instance
                         init->function(argc, args);
 
-                        stack.resize(calleeSlot);
+                        if (calleeSlot < 0 || static_cast<size_t>(calleeSlot) > stack.size())
+                        {
+                            stack.clear();
+                        }
+                        else
+                        {
+                            stack.resize(calleeSlot);
+                        }
                         stack.emplace_back(instance); // 构造函数返回实例
                         frame = &frames.back();
                     }
@@ -799,7 +825,14 @@ void VM::run()
                         auto* native = dynamic_cast<ObjNative*>(bound->method);
                         Value* args = &stack[calleeSlot + 1];
                         Value res = native->function(argc, args);
-                        stack.resize(calleeSlot);
+                        if (calleeSlot < 0 || static_cast<size_t>(calleeSlot) > stack.size())
+                        {
+                            stack.clear();
+                        }
+                        else
+                        {
+                            stack.resize(calleeSlot);
+                        }
                         stack.push_back(res);
                         frame = &frames.back();
                     }
@@ -856,7 +889,14 @@ void VM::run()
                     // 调用原生 init，args[-1] 是刚创建的 instance
                     init->function(argc, args);
 
-                    stack.resize(calleeSlot);
+                    if (calleeSlot < 0 || static_cast<size_t>(calleeSlot) > stack.size())
+                    {
+                        stack.clear();
+                    }
+                    else
+                    {
+                        stack.resize(calleeSlot);
+                    }
                     stack.emplace_back(instance); // 构造函数返回实例
                 }
                 else if (klass->methods.contains("constructor"))
@@ -896,20 +936,47 @@ void VM::run()
                 Value res = stack.back();
                 stack.pop_back();
 
-                closeUpvalues(&stack[frame->slots]);
+                int slots = frame->slots; // 在弹出帧前保存 slots
+
+                // 检查 slots 是否在有效范围内
+                if (slots < 0 || static_cast<size_t>(slots) > stack.size())
+                {
+                    stack.clear();
+                    frames.pop_back();
+                    stack.push_back(res);
+                    return;
+                }
+
+                closeUpvalues(&stack[slots]);
 
                 frames.pop_back(); // 弹出当前帧
 
                 if (frames.size() < startFrameDepth)
                 {
-                    stack.erase(stack.begin() + frame->slots, stack.end());
+                    if (static_cast<size_t>(slots) > stack.size())
+                    {
+                        stack.clear();
+                    }
+                    else
+                    {
+                        stack.erase(stack.begin() + slots, stack.end());
+                    }
                     stack.push_back(res);
                     return;
                 }
 
-                stack.erase(stack.begin() + frame->slots, stack.end());
+                if (static_cast<size_t>(slots) > stack.size())
+                {
+                    stack.clear();
+                }
+                else
+                {
+                    stack.erase(stack.begin() + slots, stack.end());
+                }
                 stack.push_back(res);
                 frame = &frames.back();
+                std::cout << "OP_RETURN: function returned, stack.size() = " << stack.size() << ", frames.size() = " <<
+                    frames.size() << std::endl;
                 break;
             }
         case OpCode::OP_BUILD_LIST:
@@ -1155,7 +1222,6 @@ void VM::waitForAsyncTasks()
 void VM::runEventLoop()
 {
     eventLoopRunning = true;
-
     // 运行事件循环，直到所有定时器都被清除
     while (true)
     {
