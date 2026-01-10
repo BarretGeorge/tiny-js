@@ -73,6 +73,10 @@ public:
     std::vector<std::future<void>> asyncTasks;
     std::mutex asyncTasksMutex;
 
+    // 活动的定时器 ID 集合（用于 clearInterval）
+    std::unordered_set<std::string> intervalIds;
+    std::mutex intervalIdsMutex;
+
     VM()
     {
         stack.reserve(2048);

@@ -3,11 +3,21 @@
 #include <chrono>
 #include <thread>
 
-Value nativeNow(VM& vm, int argc, const Value* args)
+uint64_t getNowMillis()
 {
     const auto now = std::chrono::system_clock::now().time_since_epoch();
-    const long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-    return static_cast<double>(ms);
+    return std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+}
+
+uint64_t getNowMicros()
+{
+    const auto now = std::chrono::system_clock::now().time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::microseconds>(now).count();
+}
+
+Value nativeNow(VM& vm, int argc, const Value* args)
+{
+    return static_cast<double>(getNowMillis());
 }
 
 Value nativePrint(VM& vm, const int argc, const Value* args)
@@ -264,7 +274,7 @@ Value nativeExit(VM& vm, const int argc, const Value* args)
     std::exit(exitCode);
 }
 
-Value nativeSetTimeout(VM& vm, int argc, const Value* args)
+Value nativeSetTimeout(VM& vm, const int argc, const Value* args)
 {
     if (argc < 2 || !isObjType(args[0], ObjType::CLOSURE) || !std::holds_alternative<double>(args[1]))
     {
@@ -274,7 +284,11 @@ Value nativeSetTimeout(VM& vm, int argc, const Value* args)
     {
         auto* callback = dynamic_cast<ObjClosure*>(std::get<Obj*>(args[0]));
         const int delayMs = static_cast<int>(std::get<double>(args[1]));
-        std::future<void> future = std::async(std::launch::async, [callback, delayMs]()
+
+        // 复制主 VM 的全局变量，以便回调可以访问
+        auto globalsCopy = vm.globals;
+
+        std::future<void> future = std::async(std::launch::async, [callback, delayMs, globalsCopy]()
         {
             // 等待指定的延迟
             std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
@@ -284,6 +298,8 @@ Value nativeSetTimeout(VM& vm, int argc, const Value* args)
             callbackVm.initModule();
             callbackVm.registerNative();
             callbackVm.enableJIT(false);
+            // 复制全局变量到新 VM
+            callbackVm.globals = globalsCopy;
 
             try
             {
@@ -300,5 +316,88 @@ Value nativeSetTimeout(VM& vm, int argc, const Value* args)
         vm.asyncTasks.push_back(std::move(future));
     }
 
+    return std::monostate{};
+}
+
+Value nativeSetInterval(VM& vm, const int argc, const Value* args)
+{
+    if (argc < 2 || !isObjType(args[0], ObjType::CLOSURE) || !std::holds_alternative<double>(args[1]))
+    {
+        throw std::runtime_error("setInterval requires a function and an interval in milliseconds.");
+    }
+
+    // 生成唯一的定时器 ID
+    const std::string intervalId = "interval_" + std::to_string(getNowMicros());
+
+    {
+        auto* callback = dynamic_cast<ObjClosure*>(std::get<Obj*>(args[0]));
+        const int intervalMs = static_cast<int>(std::get<double>(args[1]));
+
+        // 复制主 VM 的全局变量和 interval IDs
+        auto globalsCopy = vm.globals;
+        auto intervalIdsPtr = &vm.intervalIds;
+        auto intervalIdsMutexPtr = &vm.intervalIdsMutex;
+
+        {
+            std::lock_guard lock(vm.intervalIdsMutex);
+            vm.intervalIds.insert(intervalId);
+        }
+
+        std::future<void> future = std::async(std::launch::async, [callback, intervalMs, intervalId, globalsCopy, intervalIdsPtr, intervalIdsMutexPtr]()
+        {
+            while (true)
+            {
+                {
+                    // 检查是否需要停止
+                    std::lock_guard lock(*intervalIdsMutexPtr);
+                    // 定时器是否被清除
+                    if (!intervalIdsPtr->contains(intervalId))
+                    {
+                        break; // 退出循环，停止定时器
+                    }
+                }
+                // 等待指定的间隔
+                std::this_thread::sleep_for(std::chrono::milliseconds(intervalMs));
+
+                // 创建一个新的 VM 实例来执行回调
+                VM callbackVm;
+                callbackVm.initModule();
+                callbackVm.registerNative();
+                callbackVm.enableJIT(false);
+                // 复制全局变量到新 VM
+                callbackVm.globals = globalsCopy;
+
+                try
+                {
+                    callbackVm.stack.emplace_back(callback);
+                    callbackVm.frames.push_back({callback, callback->function->chunk.code.data(), 0});
+                    callbackVm.run();
+                }
+                catch (const std::exception& e)
+                {
+                    std::cerr << "Error in setInterval callback: " << e.what() << std::endl;
+                    break; // 出现错误时退出循环
+                }
+            }
+        });
+        std::lock_guard lock(vm.asyncTasksMutex);
+        vm.asyncTasks.push_back(std::move(future));
+    }
+
+    return vm.newString(intervalId);
+}
+
+Value nativeClearInterval(VM& vm, const int argc, const Value* args)
+{
+    if (argc < 1 || !std::holds_alternative<Obj*>(args[0]) ||
+        dynamic_cast<ObjString*>(std::get<Obj*>(args[0])) == nullptr)
+    {
+        throw std::runtime_error("Interval ID must be a string.");
+    }
+    {
+        const auto* intervalId = dynamic_cast<ObjString*>(std::get<Obj*>(args[0]));
+        std::lock_guard lock(vm.intervalIdsMutex);
+        vm.intervalIds.erase(intervalId->chars);
+    }
     return std::monostate{};
 }

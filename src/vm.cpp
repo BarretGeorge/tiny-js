@@ -235,6 +235,21 @@ void VM::registerNative()
         return nativeSetTimeout(*this, argc, args);
     });
 
+    defineNative("setInterval", [this](auto argc, auto args) -> Value
+    {
+        return nativeSetInterval(*this, argc, args);
+    });
+
+    defineNative("clearInterval", [this](auto argc, auto args) -> Value
+    {
+        return nativeClearInterval(*this, argc, args);
+    });
+
+    defineNative("exit", [this](auto argc, auto args) -> Value
+    {
+        return nativeExit(*this, argc, args);
+    });
+
     bindNativeMethod(ObjType::LIST, "clear", [this](auto argCount, auto args) -> Value
                      {
                          return nativeListClear(*this, argCount, args);

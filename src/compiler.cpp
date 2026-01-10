@@ -65,7 +65,7 @@ int Compiler::resolveUpvalue(CompilerState* s, std::string& n)
         return addUpvalue(s, static_cast<uint8_t>(l), true, s->enclosing->locals[l].isConst);
     }
     int u = resolveUpvalue(s->enclosing, n);
-    if (u != -1) return addUpvalue(s, static_cast<uint8_t>(u), false, s->enclosing->locals[l].isConst);
+    if (u != -1) return addUpvalue(s, static_cast<uint8_t>(u), false, s->enclosing->upvalues[u].isConst);
     return -1;
 }
 
@@ -186,18 +186,38 @@ void Compiler::compileStmt(const std::shared_ptr<Stmt>& stmt)
     }
     else if (const auto var_stmt = std::dynamic_pointer_cast<VarStmt>(stmt))
     {
-        if (var_stmt->initializer) compileExpr(var_stmt->initializer);
-        else emitByte(static_cast<uint8_t>(OpCode::OP_NIL));
         if (current->scopeDepth > 0)
         {
+            // 对于局部变量，先将变量声明添加到作用域，这样初始化表达式中的闭包可以捕获它
             current->locals.push_back({var_stmt->name.lexeme, current->scopeDepth, false, var_stmt->isConst});
+            if (var_stmt->initializer) compileExpr(var_stmt->initializer);
+            else emitByte(static_cast<uint8_t>(OpCode::OP_NIL));
         }
         else
         {
-            // 全局变量
+            // 全局变量：先预声明为 undefined，这样闭包可以引用它，然后再赋值
             const int i = currentChunk()->addConstant(vm.newString(var_stmt->name.lexeme));
-            OpCode opCode = var_stmt->isConst ? OpCode::OP_DEFINE_GLOBAL_CONST : OpCode::OP_DEFINE_GLOBAL;
-            emitBytes(static_cast<uint8_t>(opCode), static_cast<uint8_t>(i));
+
+            // 先将 undefined 存入全局变量
+            emitByte(static_cast<uint8_t>(OpCode::OP_NIL));
+            OpCode defineOp = var_stmt->isConst ? OpCode::OP_DEFINE_GLOBAL_CONST : OpCode::OP_DEFINE_GLOBAL;
+            emitBytes(static_cast<uint8_t>(defineOp), static_cast<uint8_t>(i));
+
+            // 然后编译初始化表达式
+            if (var_stmt->initializer)
+            {
+                compileExpr(var_stmt->initializer);
+                // 将初始化值赋给全局变量
+                OpCode setOp = var_stmt->isConst ? OpCode::OP_NIL : OpCode::OP_SET_GLOBAL; // const 变量不能再次赋值
+                if (!var_stmt->isConst)
+                {
+                    emitBytes(static_cast<uint8_t>(OpCode::OP_SET_GLOBAL), static_cast<uint8_t>(i));
+                }
+                else
+                {
+                    emitByte(static_cast<uint8_t>(OpCode::OP_POP)); // 弹出初始化表达式的值
+                }
+            }
         }
     }
     else if (const auto block_stmt = std::dynamic_pointer_cast<BlockStmt>(stmt))

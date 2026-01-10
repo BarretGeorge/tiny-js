@@ -45,4 +45,8 @@ Value nativeExit(VM& vm, int argc, const Value* args);
 
 Value nativeSetTimeout(VM& vm, int argc, const Value* args);
 
+Value nativeSetInterval(VM& vm, int argc, const Value* args);
+
+Value nativeClearInterval(VM& vm, int argc, const Value* args);
+
 #endif //TINY_JS_BASE_H
