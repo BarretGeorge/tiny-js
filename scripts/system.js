@@ -18,7 +18,6 @@ let id = setInterval(function () {
 }, 1000);
 
 setTimeout(function () {
-    println("定时器已启动,id=", id);
     clearInterval(id);
-    println("停止定时器");
+    println("停止定时器，id=", id);
 }, 3500);
