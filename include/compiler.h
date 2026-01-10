@@ -48,6 +48,9 @@ class Compiler
     // 发出两个字节指令
     void emitBytes(uint8_t b1, uint8_t b2) const;
 
+    // 发出全局变量指令（操作码 + 两字节常量索引）
+    void emitGlobalOp(uint8_t opcode, int constIdx) const;
+
     // 发出常量指令
     void emitConstant(int index) const;
 

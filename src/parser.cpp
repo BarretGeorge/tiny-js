@@ -90,6 +90,7 @@ std::shared_ptr<Stmt> Parser::varDeclaration(bool isConst)
     std::shared_ptr<Expr> i = nullptr;
     if (match(TokenType::EQUAL)) i = expression();
 
+    // 箭头函数作为初始化器时，分号是可选的
     if (std::dynamic_pointer_cast<ArrowFunctionExpr>(i))
     {
         match(TokenType::SEMICOLON);

@@ -47,6 +47,13 @@ void Compiler::emitConstant(const int index) const
     emitByte(static_cast<uint8_t>(index & 0xff));
 }
 
+void Compiler::emitGlobalOp(uint8_t opcode, const int constIdx) const
+{
+    emitByte(opcode);
+    emitByte(static_cast<uint8_t>((constIdx >> 8) & 0xff));
+    emitByte(static_cast<uint8_t>(constIdx & 0xff));
+}
+
 int Compiler::resolveLocal(const CompilerState* s, const std::string& n)
 {
     for (int i = s->locals.size() - 1; i >= 0; i--) if (s->locals[i].name == n) return i;
