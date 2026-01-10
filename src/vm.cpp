@@ -1083,8 +1083,8 @@ void VM::runWithFile(const std::string& filename)
         ObjFunction* script = compiler.compile(stmts);
         this->interpret(script);
 
-        // 等待所有异步任务完成
-        waitForAsyncTasks();
+        // 运行事件循环，处理所有异步任务
+        runEventLoop();
     }
     else
     {
@@ -1103,4 +1103,68 @@ void VM::waitForAsyncTasks()
         }
     }
     asyncTasks.clear();
+}
+
+void VM::runEventLoop()
+{
+    eventLoopRunning = true;
+
+    // 运行事件循环，直到所有定时器都被清除
+    while (true)
+    {
+        std::unique_lock<std::mutex> lock(eventQueueMutex);
+
+        // 等待新任务或超时
+        eventQueueCV.wait_for(lock, std::chrono::milliseconds(100), [this]()
+        {
+            return !eventQueue.empty();
+        });
+
+        // 检查是否还有活动的 interval
+        bool hasActiveInterval = false;
+        {
+            std::lock_guard intervalLock(intervalIdsMutex);
+            hasActiveInterval = !intervalIds.empty();
+        }
+
+        // 如果没有任务且没有活动的 interval，退出循环
+        if (eventQueue.empty() && !hasActiveInterval)
+        {
+            break;
+        }
+
+        // 处理队列中的任务
+        while (!eventQueue.empty())
+        {
+            EventTask task = eventQueue.front();
+            eventQueue.pop();
+
+            // 释放锁后再执行任务，避免死锁
+            lock.unlock();
+
+            try
+            {
+                // 在主 VM 上执行回调
+                stack.emplace_back(task.callback);
+                frames.push_back({task.callback, task.callback->function->chunk.code.data(), 0});
+                run();
+            }
+            catch (const std::exception& e)
+            {
+                std::cerr << "Error executing event task: " << e.what() << std::endl;
+
+                // 如果是 interval 任务出错，清除它
+                if (task.isInterval)
+                {
+                    std::lock_guard intervalLock(intervalIdsMutex);
+                    intervalIds.erase(task.intervalId);
+                }
+            }
+
+            // 重新获取锁以检查队列
+            lock.lock();
+        }
+    }
+
+    eventLoopRunning = false;
 }

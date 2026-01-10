@@ -281,40 +281,31 @@ Value nativeSetTimeout(VM& vm, const int argc, const Value* args)
         throw std::runtime_error("setTimeout requires a function and a delay in milliseconds.");
     }
 
+    auto* callback = dynamic_cast<ObjClosure*>(std::get<Obj*>(args[0]));
+    const int delayMs = static_cast<int>(std::get<double>(args[1]));
+
+    // 定时器线程添加任务
+    std::future<void> future = std::async(std::launch::async, [&vm, callback, delayMs]()
     {
-        auto* callback = dynamic_cast<ObjClosure*>(std::get<Obj*>(args[0]));
-        const int delayMs = static_cast<int>(std::get<double>(args[1]));
+        // 等待指定的延迟
+        std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
 
-        // 复制主 VM 的全局变量，以便回调可以访问
-        auto globalsCopy = vm.globals;
+        // 检查事件循环是否还在运行
+        if (!vm.eventLoopRunning) return;
 
-        std::future<void> future = std::async(std::launch::async, [callback, delayMs, globalsCopy]()
         {
-            // 等待指定的延迟
-            std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
+            std::lock_guard lock(vm.eventQueueMutex);
+            EventTask task;
+            task.callback = callback;
+            task.executeTime = getNowMillis() + delayMs;
+            task.isInterval = false;
+            vm.eventQueue.push(task);
+        }
+        vm.eventQueueCV.notify_one();
+    });
 
-            // 创建一个新的 VM 实例来执行回调
-            VM callbackVm;
-            callbackVm.initModule();
-            callbackVm.registerNative();
-            callbackVm.enableJIT(false);
-            // 复制全局变量到新 VM
-            callbackVm.globals = globalsCopy;
-
-            try
-            {
-                callbackVm.stack.emplace_back(callback);
-                callbackVm.frames.push_back({callback, callback->function->chunk.code.data(), 0});
-                callbackVm.run();
-            }
-            catch (const std::exception& e)
-            {
-                std::cerr << "Error in setTimeout callback: " << e.what() << std::endl;
-            }
-        });
-        std::lock_guard lock(vm.asyncTasksMutex);
-        vm.asyncTasks.push_back(std::move(future));
-    }
+    std::lock_guard lock(vm.asyncTasksMutex);
+    vm.asyncTasks.push_back(std::move(future));
 
     return std::monostate{};
 }
@@ -329,60 +320,61 @@ Value nativeSetInterval(VM& vm, const int argc, const Value* args)
     // 生成唯一的定时器 ID
     const std::string intervalId = "interval_" + std::to_string(getNowMicros());
 
+    auto* callback = dynamic_cast<ObjClosure*>(std::get<Obj*>(args[0]));
+    const int intervalMs = static_cast<int>(std::get<double>(args[1]));
+
+    // 注册 interval ID
     {
-        auto* callback = dynamic_cast<ObjClosure*>(std::get<Obj*>(args[0]));
-        const int intervalMs = static_cast<int>(std::get<double>(args[1]));
+        std::lock_guard lock(vm.intervalIdsMutex);
+        vm.intervalIds.insert(intervalId);
+    }
 
-        // 复制主 VM 的全局变量和 interval IDs
-        auto globalsCopy = vm.globals;
-        auto intervalIdsPtr = &vm.intervalIds;
-        auto intervalIdsMutexPtr = &vm.intervalIdsMutex;
-
+    // 定时器线程循环添加任务
+    std::future<void> future = std::async(std::launch::async, [&vm, callback, intervalMs, intervalId]()
+    {
+        while (true)
         {
-            std::lock_guard lock(vm.intervalIdsMutex);
-            vm.intervalIds.insert(intervalId);
-        }
-
-        std::future<void> future = std::async(std::launch::async, [callback, intervalMs, intervalId, globalsCopy, intervalIdsPtr, intervalIdsMutexPtr]()
-        {
-            while (true)
+            // 检查是否还在活动
             {
+                std::lock_guard lock(vm.intervalIdsMutex);
+                if (!vm.intervalIds.contains(intervalId))
                 {
-                    // 检查是否需要停止
-                    std::lock_guard lock(*intervalIdsMutexPtr);
-                    // 定时器是否被清除
-                    if (!intervalIdsPtr->contains(intervalId))
-                    {
-                        break; // 退出循环，停止定时器
-                    }
-                }
-                // 等待指定的间隔
-                std::this_thread::sleep_for(std::chrono::milliseconds(intervalMs));
-
-                // 创建一个新的 VM 实例来执行回调
-                VM callbackVm;
-                callbackVm.initModule();
-                callbackVm.registerNative();
-                callbackVm.enableJIT(false);
-                // 复制全局变量到新 VM
-                callbackVm.globals = globalsCopy;
-
-                try
-                {
-                    callbackVm.stack.emplace_back(callback);
-                    callbackVm.frames.push_back({callback, callback->function->chunk.code.data(), 0});
-                    callbackVm.run();
-                }
-                catch (const std::exception& e)
-                {
-                    std::cerr << "Error in setInterval callback: " << e.what() << std::endl;
-                    break; // 出现错误时退出循环
+                    break; // 定时器被清除，退出
                 }
             }
-        });
-        std::lock_guard lock(vm.asyncTasksMutex);
-        vm.asyncTasks.push_back(std::move(future));
-    }
+
+            // 等待指定的间隔
+            std::this_thread::sleep_for(std::chrono::milliseconds(intervalMs));
+
+            // 再次检查是否还在活动（等待期间可能被清除）
+            {
+                std::lock_guard lock(vm.intervalIdsMutex);
+                if (!vm.intervalIds.contains(intervalId))
+                {
+                    break; // 定时器被清除，退出
+                }
+            }
+
+            // 检查事件循环是否还在运行
+            if (!vm.eventLoopRunning) break;
+
+            // 将任务放入事件队列
+            {
+                std::lock_guard lock(vm.eventQueueMutex);
+                EventTask task;
+                task.callback = callback;
+                task.executeTime = getNowMillis();
+                task.isInterval = true;
+                task.intervalId = intervalId;
+                task.intervalMs = intervalMs;
+                vm.eventQueue.push(task);
+            }
+            vm.eventQueueCV.notify_one();
+        }
+    });
+
+    std::lock_guard lock(vm.asyncTasksMutex);
+    vm.asyncTasks.push_back(std::move(future));
 
     return vm.newString(intervalId);
 }

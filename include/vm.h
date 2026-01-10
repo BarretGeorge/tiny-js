@@ -7,6 +7,9 @@
 #include <unordered_set>
 #include <future>
 #include <mutex>
+#include <condition_variable>
+#include <queue>
+#include <chrono>
 
 // 调用栈帧结构体
 struct CallFrame
@@ -17,6 +20,16 @@ struct CallFrame
     uint8_t* ip;
     // 栈起始位置
     int slots;
+};
+
+// 事件任务结构体
+struct EventTask
+{
+    ObjClosure* callback;
+    uint64_t executeTime; // 执行时间戳（毫秒）
+    bool isInterval; // 是否为 interval 任务
+    std::string intervalId; // interval 的 ID（仅 interval 任务需要）
+    int intervalMs; // interval 的间隔（仅 interval 任务需要）
 };
 
 class VM
@@ -76,6 +89,12 @@ public:
     // 活动的定时器 ID 集合（用于 clearInterval）
     std::unordered_set<std::string> intervalIds;
     std::mutex intervalIdsMutex;
+
+    // 事件队列
+    std::queue<EventTask> eventQueue;
+    std::mutex eventQueueMutex;
+    std::condition_variable eventQueueCV;
+    bool eventLoopRunning = false;
 
     VM()
     {
@@ -162,6 +181,9 @@ public:
 
     // 等待所有异步任务完成
     void waitForAsyncTasks();
+
+    // 运行事件循环（处理事件队列中的任务）
+    void runEventLoop();
 
     // 启用或禁用 JIT 编译
     void enableJIT(const bool enable = true) { jitEnabled = enable; }
