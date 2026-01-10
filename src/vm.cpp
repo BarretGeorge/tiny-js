@@ -478,6 +478,7 @@ void VM::run()
                     return;
                 }
                 globals[n] = stack.back();
+                stack.pop_back();
                 break;
             }
         case OpCode::OP_GET_UPVALUE: stack.push_back(*frame->closure->upvalues[READ_BYTE()]->location);
@@ -514,20 +515,42 @@ void VM::run()
             }
         case OpCode::OP_GREATER:
             {
-                double b = std::get<double>(stack.back());
+                Value bVal = stack.back();
                 stack.pop_back();
-                double a = std::get<double>(stack.back());
+                Value aVal = stack.back();
                 stack.pop_back();
-                stack.emplace_back(a > b);
+
+                if (std::holds_alternative<double>(aVal) && std::holds_alternative<double>(bVal))
+                {
+                    double b = std::get<double>(bVal);
+                    double a = std::get<double>(aVal);
+                    stack.emplace_back(a > b);
+                }
+                else
+                {
+                    runtimeError("Operands must be numbers for comparison.");
+                    return;
+                }
                 break;
             }
         case OpCode::OP_LESS:
             {
-                double b = std::get<double>(stack.back());
+                Value bVal = stack.back();
                 stack.pop_back();
-                double a = std::get<double>(stack.back());
+                Value aVal = stack.back();
                 stack.pop_back();
-                stack.emplace_back(a < b);
+
+                if (std::holds_alternative<double>(aVal) && std::holds_alternative<double>(bVal))
+                {
+                    double b = std::get<double>(bVal);
+                    double a = std::get<double>(aVal);
+                    stack.emplace_back(a < b);
+                }
+                else
+                {
+                    runtimeError("Operands must be numbers for comparison.");
+                    return;
+                }
                 break;
             }
 
@@ -676,7 +699,25 @@ void VM::run()
 
                         // 调用 JIT 函数
                         auto jitFn = reinterpret_cast<JitCompiler::JitFn>(cl->function->jitFunction);
-                        double result = jitFn(args);
+                        double result;
+                        try
+                        {
+                            result = jitFn(args);
+                        }
+                        catch (const std::exception& e)
+                        {
+                            std::cout << "JIT函数执行异常: " << e.what() << std::endl;
+                            frames.push_back({cl, cl->function->chunk.code.data(), calleeSlot});
+                            frame = &frames.back();
+                            goto call_end;
+                        }
+                        catch (...)
+                        {
+                            std::cout << "JIT函数执行未知异常" << std::endl;
+                            frames.push_back({cl, cl->function->chunk.code.data(), calleeSlot});
+                            frame = &frames.back();
+                            goto call_end;
+                        }
 
                         // 处理返回值
                         stack.resize(calleeSlot);
@@ -1118,7 +1159,7 @@ void VM::runEventLoop()
     // 运行事件循环，直到所有定时器都被清除
     while (true)
     {
-        std::unique_lock<std::mutex> lock(eventQueueMutex);
+        std::unique_lock lock(eventQueueMutex);
 
         // 等待新任务或超时
         eventQueueCV.wait_for(lock, std::chrono::milliseconds(100), [this]()

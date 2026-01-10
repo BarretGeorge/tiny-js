@@ -8,20 +8,33 @@ constexpr auto ZERO_VALUE = 0.0;
 
 JitCompiler::JitFn JitCompiler::compile(const Chunk* chunk)
 {
-    CodeHolder code;
-    code.init(rt.environment());
+    try
+    {
+        CodeHolder code;
+        code.init(rt.environment());
 
-    // 根据架构选择编译器
-    if (rt.environment().is_family_x86())
-    {
-        return compileX86(chunk, code);
+        // 根据架构选择编译器
+        if (rt.environment().is_family_x86())
+        {
+            return compileX86(chunk, code);
+        }
+        if (rt.environment().is_family_aarch64())
+        {
+            return compileAArch64(chunk, code);
+        }
+        std::cout << "Unsupported architecture for JIT compilation" << std::endl;
+        return nullptr;
     }
-    if (rt.environment().is_family_aarch64())
+    catch (const std::exception& e)
     {
-        return compileAArch64(chunk, code);
+        std::cout << "JIT compilation exception: " << e.what() << std::endl;
+        return nullptr;
     }
-    std::cout << "Unsupported architecture for JIT compilation" << std::endl;
-    return nullptr;
+    catch (...)
+    {
+        std::cout << "JIT compilation unknown exception" << std::endl;
+        return nullptr;
+    }
 }
 
 JitCompiler::JitFn JitCompiler::compileX86(const Chunk* chunk, CodeHolder& code)
@@ -52,7 +65,9 @@ JitCompiler::JitFn JitCompiler::compileX86(const Chunk* chunk, CodeHolder& code)
         {
         case static_cast<uint8_t>(OpCode::OP_CONSTANT):
             {
-                const uint8_t idx = chunk->code[ip++];
+                const uint8_t highByte = chunk->code[ip++];
+                const uint8_t lowByte = chunk->code[ip++];
+                const uint16_t idx = highByte << 8 | lowByte;
                 const double* value = std::get_if<double>(&chunk->constants[idx]);
                 if (!value)
                 {
@@ -278,7 +293,9 @@ JitCompiler::JitFn JitCompiler::compileAArch64(const Chunk* chunk, CodeHolder& c
         {
         case static_cast<uint8_t>(OpCode::OP_CONSTANT):
             {
-                const uint8_t idx = chunk->code[ip++];
+                const uint8_t highByte = chunk->code[ip++];
+                const uint8_t lowByte = chunk->code[ip++];
+                const uint16_t idx = highByte << 8 | lowByte;
                 const double* value = std::get_if<double>(&chunk->constants[idx]);
                 if (!value)
                 {
