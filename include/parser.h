@@ -15,7 +15,8 @@ class Parser
     std::string filename;
 
 public:
-    explicit Parser(const std::vector<Token>& t,std::string filename = "<script>") : tokens(t), filename(std::move(filename))
+    explicit Parser(const std::vector<Token>& t, std::string filename = "<script>") : tokens(t),
+        filename(std::move(filename))
     {
     }
 
@@ -117,6 +118,12 @@ private:
 
     // 解析类声明
     std::shared_ptr<Stmt> classDeclaration();
+
+    // 解析import语句
+    std::shared_ptr<Stmt> importDeclaration();
+
+    // 解析export语句
+    std::shared_ptr<Stmt> exportDeclaration();
 };
 
 #endif //TINY_JS_PARSER_H

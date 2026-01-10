@@ -28,7 +28,11 @@ class Scanner
         {"let", TokenType::VAR},
         {"while", TokenType::WHILE},
         {"const", TokenType::CONST},
-        {"new", TokenType::NEW}
+        {"new", TokenType::NEW},
+        {"import", TokenType::IMPORT},
+        {"from", TokenType::FROM},
+        {"export", TokenType::EXPORT},
+        {"extends", TokenType::EXTENDS}
     };
 
 public:

@@ -1,4 +1,5 @@
 #include "native/require.h"
+#include "object.h"
 #include <iostream>
 
 Value nativeRequire(VM& vm, const int argc, const Value* args)
@@ -31,21 +32,56 @@ Value nativeRequire(VM& vm, const int argc, const Value* args)
         return std::monostate{};
     }
 
+    // 保存旧的 exports 对象（如果存在）
+    Value oldExports = std::monostate{};
+    bool hadExports = vm.globals.contains("exports");
+    if (hadExports)
+    {
+        oldExports = vm.globals["exports"];
+    }
+
+    // 创建一个空的 exports 类和实例
+    auto* exportsClass = vm.allocate<ObjClass>("exports");
+    auto* exportsObj = vm.allocate<ObjInstance>(exportsClass);
+    vm.tempRoots.push_back(exportsObj);
+
+    // 将 exports 注入到全局变量中
+    vm.globals["exports"] = exportsObj;
+
+    // 编译模块
     ObjFunction* moduleScript = vm.compilerHook(source, path);
-    if (!moduleScript) return std::monostate{};
+    if (!moduleScript)
+    {
+        // 恢复旧的 exports 对象
+        if (hadExports)
+        {
+            vm.globals["exports"] = oldExports;
+        }
+        else
+        {
+            vm.globals.erase("exports");
+        }
+        vm.tempRoots.pop_back();
+        return std::monostate{};
+    }
 
+    // 创建模块闭包并使用 callAndRun
     auto* moduleClosure = vm.allocate<ObjClosure>(moduleScript);
+    vm.callAndRun(moduleClosure);
 
-    vm.stack.emplace_back(moduleClosure);
+    // 恢复旧的 exports 对象
+    if (hadExports)
+    {
+        vm.globals["exports"] = oldExports;
+    }
+    else
+    {
+        vm.globals.erase("exports");
+    }
 
-    vm.frames.push_back({moduleClosure, moduleScript->chunk.code.data(), static_cast<int>(vm.stack.size()) - 1});
-    vm.run();
+    vm.tempRoots.pop_back();
 
-    const Value result = vm.stack.back();
-    vm.stack.pop_back();
-    vm.stack.pop_back();
-
-    // 缓存模块结果
-    vm.modules[path] = result;
-    return result;
+    // 返回 exports 对象
+    vm.modules[path] = exportsObj;
+    return exportsObj;
 }

@@ -59,6 +59,8 @@ Token Parser::consume(const TokenType t, const std::string& m)
 
 std::shared_ptr<Stmt> Parser::declaration()
 {
+    if (match(TokenType::IMPORT)) return importDeclaration();
+    if (match(TokenType::EXPORT)) return exportDeclaration();
     if (match(TokenType::CLASS)) return classDeclaration();
     if (match(TokenType::FUN)) return function("function");
     if (match(TokenType::VAR)) return varDeclaration(false);
@@ -608,4 +610,47 @@ std::shared_ptr<Stmt> Parser::classDeclaration()
     consume(TokenType::RIGHT_BRACE, "Expect '}' after class body.");
 
     return std::make_shared<ClassStmt>(name, methods);
+}
+
+std::shared_ptr<Stmt> Parser::importDeclaration()
+{
+    // import { add, PI } from "util.js";
+    consume(TokenType::LEFT_BRACE, "Expect '{' after import.");
+
+    std::vector<Token> specifiers;
+    if (!check(TokenType::RIGHT_BRACE))
+    {
+        do
+        {
+            specifiers.push_back(consume(TokenType::IDENTIFIER, "Expect identifier in import list."));
+        }
+        while (match(TokenType::COMMA));
+    }
+
+    consume(TokenType::RIGHT_BRACE, "Expect '}' after import list.");
+    consume(TokenType::FROM, "Expect 'from' after import list.");
+    Token source = consume(TokenType::STRING, "Expect module path string.");
+    consume(TokenType::SEMICOLON, "Expect ';' after import statement.");
+
+    return std::make_shared<ImportStmt>(specifiers, source);
+}
+
+std::shared_ptr<Stmt> Parser::exportDeclaration()
+{
+    consume(TokenType::LEFT_BRACE, "Expect '{' after export.");
+
+    std::vector<Token> specifiers;
+    if (!check(TokenType::RIGHT_BRACE))
+    {
+        do
+        {
+            specifiers.push_back(consume(TokenType::IDENTIFIER, "Expect identifier in export list."));
+        }
+        while (match(TokenType::COMMA));
+    }
+
+    consume(TokenType::RIGHT_BRACE, "Expect '}' after export list.");
+    consume(TokenType::SEMICOLON, "Expect ';' after export statement.");
+
+    return std::make_shared<ExportStmt>(specifiers);
 }

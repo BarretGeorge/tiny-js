@@ -82,6 +82,13 @@ public:
         stack.reserve(2048);
     }
 
+    // 用于模块系统的构造函数，复制全局变量
+    explicit VM(const std::map<std::string, Value>& globalVars)
+    {
+        stack.reserve(2048);
+        globals = globalVars;
+    }
+
     ~VM() { freeObjects(); }
 
     // 分配新对象并添加到对象链表

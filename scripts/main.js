@@ -2,11 +2,10 @@
 /*
     多行注释测试
 */
-var util = require("util.js");
-
-let add = util[0];
+import {add, PI} from "util.js";
 
 println("2 + 3 = " + add(2, 3));
+println("PI = " + PI);
 
 let str = "Hello, ";
 
@@ -16,10 +15,9 @@ function greet(name) {
 
 println(greet("World"));
 
-str = "Count: ";
+var str = "Count: ";
 for (var i = 0; i < 5; i++) {
-    str = str + "(" + i + ") ";
-    println(str);
+    println(str + "(" + i + ")");
 }
 
 // str = "当前时间戳=" + now();

@@ -303,4 +303,25 @@ struct ClassStmt : Stmt
     }
 };
 
+// Import 语句
+struct ImportStmt : Stmt
+{
+    std::vector<Token> specifiers; // 导入的名称列表
+    Token source;                  // 模块路径
+
+    ImportStmt(auto s, auto src) : specifiers(s), source(src)
+    {
+    }
+};
+
+// Export 语句
+struct ExportStmt : Stmt
+{
+    std::vector<Token> specifiers; // 导出的名称列表
+
+    explicit ExportStmt(auto s) : specifiers(s)
+    {
+    }
+};
+
 #endif //TINY_JS_AST_H

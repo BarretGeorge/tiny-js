@@ -195,27 +195,32 @@ void Compiler::compileStmt(const std::shared_ptr<Stmt>& stmt)
         }
         else
         {
-            // 全局变量：先预声明为 undefined，这样闭包可以引用它，然后再赋值
+            // 全局变量
             const int i = currentChunk()->addConstant(vm.newString(var_stmt->name.lexeme));
 
-            // 先将 undefined 存入全局变量
-            emitByte(static_cast<uint8_t>(OpCode::OP_NIL));
-            OpCode defineOp = var_stmt->isConst ? OpCode::OP_DEFINE_GLOBAL_CONST : OpCode::OP_DEFINE_GLOBAL;
-            emitBytes(static_cast<uint8_t>(defineOp), static_cast<uint8_t>(i));
-
-            // 然后编译初始化表达式
-            if (var_stmt->initializer)
+            if (var_stmt->isConst)
             {
-                compileExpr(var_stmt->initializer);
-                // 将初始化值赋给全局变量
-                OpCode setOp = var_stmt->isConst ? OpCode::OP_NIL : OpCode::OP_SET_GLOBAL; // const 变量不能再次赋值
-                if (!var_stmt->isConst)
+                // const 变量：直接用初始化值定义，不需要预声明
+                if (var_stmt->initializer)
                 {
-                    emitBytes(static_cast<uint8_t>(OpCode::OP_SET_GLOBAL), static_cast<uint8_t>(i));
+                    compileExpr(var_stmt->initializer);
                 }
                 else
                 {
-                    emitByte(static_cast<uint8_t>(OpCode::OP_POP)); // 弹出初始化表达式的值
+                    emitByte(static_cast<uint8_t>(OpCode::OP_NIL));
+                }
+                emitBytes(static_cast<uint8_t>(OpCode::OP_DEFINE_GLOBAL_CONST), static_cast<uint8_t>(i));
+            }
+            else
+            {
+                // var 变量：先预声明为 undefined，这样闭包可以引用它，然后再赋值
+                emitByte(static_cast<uint8_t>(OpCode::OP_NIL));
+                emitBytes(static_cast<uint8_t>(OpCode::OP_DEFINE_GLOBAL), static_cast<uint8_t>(i));
+
+                if (var_stmt->initializer)
+                {
+                    compileExpr(var_stmt->initializer);
+                    emitBytes(static_cast<uint8_t>(OpCode::OP_SET_GLOBAL), static_cast<uint8_t>(i));
                 }
             }
         }
@@ -277,6 +282,102 @@ void Compiler::compileStmt(const std::shared_ptr<Stmt>& stmt)
             emitBytes(static_cast<uint8_t>(OpCode::OP_METHOD), static_cast<uint8_t>(constIdx));
         }
         emitByte(static_cast<uint8_t>(OpCode::OP_POP)); // 弹出类对象
+    }
+    else if (const auto import_stmt = std::dynamic_pointer_cast<ImportStmt>(stmt))
+    {
+        // import { add, PI } from "util.js"
+        // 编译为: require("util.js") 返回 exports 对象
+        // 然后从 exports 对象中提取每个属性并定义为全局变量
+
+        // 1. 调用 require 函数
+        // 注意：OP_CALL 期望栈布局为 [..., callee, arg1, arg2, ...]
+        // calleeSlot = stack.size() - 1 - argc，所以被调用者在参数之前压入
+        const int requireIdx = currentChunk()->addConstant(vm.newString("require"));
+
+        // 先压入被调用者（require函数）
+        emitBytes(static_cast<uint8_t>(OpCode::OP_GET_GLOBAL), static_cast<uint8_t>(requireIdx));
+
+        // 再压入参数（模块路径）
+        std::string modulePath = import_stmt->source.lexeme;
+        // 去掉引号
+        if (modulePath.size() >= 2 && (modulePath[0] == '"' || modulePath[0] == '\''))
+        {
+            modulePath = modulePath.substr(1, modulePath.size() - 2);
+        }
+        const int pathIdx = currentChunk()->addConstant(vm.newString(modulePath));
+        emitBytes(static_cast<uint8_t>(OpCode::OP_CONSTANT), static_cast<uint8_t>(pathIdx));
+
+        emitBytes(static_cast<uint8_t>(OpCode::OP_CALL), 1); // 调用 require(path)，1个参数
+        // 栈顶现在是 exports 对象
+
+        // 3. 对于每个导入的名称，从 exports 对象中提取属性并定义为全局变量
+        for (size_t i = 0; i < import_stmt->specifiers.size(); i++)
+        {
+            // 如果不是第一个 specifier，需要复制 exports 对象
+            // 因为 OP_GET_PROPERTY 会消耗对象
+            if (i > 0)
+            {
+                // 重新调用 require 获取 exports 对象
+                // 注意：必须按正确的顺序压栈：先 callee，再参数
+                emitBytes(static_cast<uint8_t>(OpCode::OP_GET_GLOBAL), static_cast<uint8_t>(requireIdx));
+                emitBytes(static_cast<uint8_t>(OpCode::OP_CONSTANT), static_cast<uint8_t>(pathIdx));
+                emitBytes(static_cast<uint8_t>(OpCode::OP_CALL), 1);
+            }
+
+            // 获取属性 exports.name
+            const auto& spec = import_stmt->specifiers[i];
+            const int propNameIdx = currentChunk()->addConstant(vm.newString(spec.lexeme));
+            emitBytes(static_cast<uint8_t>(OpCode::OP_GET_PROPERTY), static_cast<uint8_t>(propNameIdx));
+
+            // 定义为全局变量
+            const int globalNameIdx = currentChunk()->addConstant(vm.newString(spec.lexeme));
+            emitBytes(static_cast<uint8_t>(OpCode::OP_DEFINE_GLOBAL), static_cast<uint8_t>(globalNameIdx));
+        }
+    }
+    else if (const auto export_stmt = std::dynamic_pointer_cast<ExportStmt>(stmt))
+    {
+        // export { add, area, PI }
+        // 将每个变量设置为 exports 对象的属性
+
+        for (const auto& spec : export_stmt->specifiers)
+        {
+            // 获取变量值
+            const int varNameIdx = currentChunk()->addConstant(vm.newString(spec.lexeme));
+
+            // 首先尝试作为局部变量
+            int localIdx = -1;
+            for (int i = static_cast<int>(current->locals.size()) - 1; i >= 0; i--)
+            {
+                if (current->locals[i].name == spec.lexeme)
+                {
+                    localIdx = i;
+                    break;
+                }
+            }
+
+            // 注意：OP_SET_PROPERTY 期望栈顶是对象，次栈顶是值
+            // 所以要先压入对象，再压入值
+            // 获取 exports 全局对象
+            const int exportsIdx = currentChunk()->addConstant(vm.newString("exports"));
+            emitBytes(static_cast<uint8_t>(OpCode::OP_GET_GLOBAL), static_cast<uint8_t>(exportsIdx));
+
+            // 获取变量值
+            if (localIdx != -1)
+            {
+                emitBytes(static_cast<uint8_t>(OpCode::OP_GET_LOCAL), static_cast<uint8_t>(localIdx));
+            }
+            else
+            {
+                emitBytes(static_cast<uint8_t>(OpCode::OP_GET_GLOBAL), static_cast<uint8_t>(varNameIdx));
+            }
+
+            // 设置属性 exports.name = value
+            // 栈状态: [value, exports]
+            emitBytes(static_cast<uint8_t>(OpCode::OP_SET_PROPERTY), static_cast<uint8_t>(varNameIdx));
+
+            // OP_SET_PROPERTY leaves value on stack, pop it
+            emitByte(static_cast<uint8_t>(OpCode::OP_POP));
+        }
     }
 }
 

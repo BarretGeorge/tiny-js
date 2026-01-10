@@ -10,5 +10,9 @@ function area(r) {
     return PI * r * r;
 }
 
-const exports = [add, area];
-return exports;
+// 导出模块内容
+export {
+    add,
+    area,
+    PI
+};

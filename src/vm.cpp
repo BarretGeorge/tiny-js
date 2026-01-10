@@ -472,6 +472,7 @@ void VM::run()
                     return;
                 }
                 globals[n] = stack.back();
+                stack.pop_back();  // 弹出值，赋值表达式不留值
                 break;
             }
         case OpCode::OP_GET_UPVALUE: stack.push_back(*frame->closure->upvalues[READ_BYTE()]->location);
@@ -1070,6 +1071,11 @@ void VM::runWithFile(const std::string& filename)
 {
     if (const std::string source = readFile(filename); !source.empty())
     {
+        // 创建一个全局 exports 对象（用于 export 语句）
+        auto* exportsClass = allocate<ObjClass>("exports");
+        auto* exportsObj = allocate<ObjInstance>(exportsClass);
+        globals["exports"] = exportsObj;
+
         Scanner scanner(source);
         const auto tokens = scanner.scanTokens();
         Parser parser(tokens, filename);

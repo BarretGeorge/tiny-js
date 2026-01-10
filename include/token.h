@@ -82,7 +82,10 @@ enum class TokenType
     // 逻辑或
     OR_OR,
     /** 关键字 开始 **/
-    AND, CLASS, ELSE, FALSE, FUN, FOR, IF, NULLPTR, OR, RETURN, SUPER, THIS, TRUE, VAR, WHILE, CONST, NEW,
+    AND, CLASS, ELSE, FALSE, FUN, FOR, IF,
+    NULLPTR, OR, RETURN, SUPER, THIS, TRUE,
+    VAR, WHILE, CONST, NEW, IMPORT, EXPORT,
+    FROM, EXTENDS,
     /** 关键字 结束 **/
     END_OF_FILE
 };
