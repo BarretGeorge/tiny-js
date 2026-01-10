@@ -84,7 +84,13 @@ void Scanner::scanToken(std::vector<Token>& t)
         break;
     case '!': addToken(t, match('=') ? TokenType::BANG_EQUAL : TokenType::BANG);
         break;
-    case '=': addToken(t, match('=') ? TokenType::EQUAL_EQUAL : TokenType::EQUAL);
+    case '=':
+        if (match('='))
+            addToken(t, TokenType::EQUAL_EQUAL);
+        else if (match('>'))
+            addToken(t, TokenType::ARROW);
+        else
+            addToken(t, TokenType::EQUAL);
         break;
     case '|':
         if (match('|'))

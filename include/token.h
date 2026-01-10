@@ -45,6 +45,8 @@ enum class TokenType
     EQUAL,
     // 双等号
     EQUAL_EQUAL,
+    // 箭头 (=>)
+    ARROW,
     // 大于号
     GREATER,
     // 大于等于号

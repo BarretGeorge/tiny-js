@@ -72,6 +72,9 @@ class Compiler
     // 编译匿名函数表达式
     void compileFunctionExpression(const std::shared_ptr<FunctionExpr>& expr);
 
+    // 编译箭头函数表达式
+    void compileArrowFunctionExpression(const std::shared_ptr<ArrowFunctionExpr>& expr);
+
 public:
     explicit Compiler(VM& v) : vm(v)
     {

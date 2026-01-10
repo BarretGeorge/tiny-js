@@ -9,7 +9,7 @@ setTimeout(function () {
     println("两秒后执行的代码");
 }, 2000);
 
-setTimeout(function () {
+setTimeout(() => {
     println("三秒后执行的代码");
 }, 3000);
 
@@ -18,7 +18,7 @@ let id = setInterval(function () {
 }, 1000);
 
 setTimeout(function () {
-    println("定时器已启动,id=" , id);
+    println("定时器已启动,id=", id);
     clearInterval(id);
     println("停止定时器");
 }, 3500);

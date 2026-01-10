@@ -90,6 +90,16 @@ function greet(name) {
 
 println("add(10, 20) = " + add(10, 20));
 println("greet('World') = " + greet('World'));
+
+let multiply = (x, y) => x * y;
+println("multiply(5, 4) = " + multiply(5, 4));
+
+let square = x => x * x;
+println("square(6) = " + square(6));
+
+let noParam = () => "No parameters";
+println("noParam() = " + noParam());
+
 println("======================");
 
 // 8. 阶乘函数（递归）

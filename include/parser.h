@@ -37,6 +37,9 @@ private:
     // 返回当前token
     Token peek();
 
+    // 查看下一个token
+    Token peekNext();
+
     // 返回上一个token
     Token previous();
 
@@ -105,6 +108,9 @@ private:
 
     // 解析函数调用表达式
     std::shared_ptr<Expr> call();
+
+    // 解析箭头函数
+    std::shared_ptr<Expr> arrowFunction();
 
     // 解析基础表达式
     std::shared_ptr<Expr> primary();

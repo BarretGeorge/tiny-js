@@ -38,6 +38,12 @@ Token Parser::peek()
     return tokens[current];
 }
 
+Token Parser::peekNext()
+{
+    if (current + 1 >= tokens.size()) return tokens[current];
+    return tokens[current + 1];
+}
+
 Token Parser::previous()
 {
     return tokens[current - 1];
@@ -423,6 +429,47 @@ std::shared_ptr<Expr> Parser::call()
                 throw std::runtime_error("Invalid target for postfix update.");
             }
         }
+        else if (match(TokenType::ARROW))
+        {
+            // 箭头函数: params => body
+            std::vector<Token> params;
+            if (auto var = std::dynamic_pointer_cast<Variable>(e))
+            {
+                // 单个参数，无括号: x => expr
+                params.push_back(var->name);
+            }
+            else if (auto paren = std::dynamic_pointer_cast<Expr>(e))
+            {
+                // 括号内的参数列表: (x, y) => expr
+                // 此时 e 是括号内的表达式，应该是参数列表
+                // 实际上这个情况会在 primary() 中处理，当遇到 '(' 时
+                // 我们需要回溯，但更简单的方法是在 primary() 中直接检测箭头函数
+                throw std::runtime_error("[" + filename + ":" + std::to_string(previous().line) + "] Error: Arrow function parsing error.");
+            }
+            else
+            {
+                throw std::runtime_error("[" + filename + ":" + std::to_string(previous().line) + "] Error: Invalid arrow function syntax.");
+            }
+
+            // 解析函数体
+            std::vector<std::shared_ptr<Stmt>> body;
+            if (check(TokenType::LEFT_BRACE))
+            {
+                // 块体: => { stmts }
+                consume(TokenType::LEFT_BRACE, "Expect '{'.");
+                auto blockStmt = std::static_pointer_cast<BlockStmt>(block());
+                body = blockStmt->statements;
+            }
+            else
+            {
+                // 简写: => expr
+                // 将表达式包装在 return 语句中
+                auto expr = expression();
+                body.push_back(std::make_shared<ReturnStmt>(Token{TokenType::RETURN, "return", previous().line, {}}, expr));
+            }
+
+            e = std::make_shared<ArrowFunctionExpr>(params, body);
+        }
         else break;
     }
     return e;
@@ -439,6 +486,74 @@ std::shared_ptr<Expr> Parser::primary()
     if (match(TokenType::IDENTIFIER)) return std::make_shared<Variable>(previous());
     if (match(TokenType::LEFT_PAREN))
     {
+        // 检查是否是箭头函数的参数列表
+        // 只有 (IDENTIFIER COMMA ...) 或 (IDENTIFIER RIGHT_PAREN ARROW) 或 () ARROW 时才是箭头函数
+
+        // 检查是否是 () => 的情况
+        // match(LEFT_PAREN) 已经推进了 current，所以现在 current 指向 )
+        // 如果 ) 后面是 =>，则是无参数箭头函数
+        if (check(TokenType::RIGHT_PAREN) && current + 1 < tokens.size() && tokens[current + 1].type == TokenType::ARROW)
+        {
+            // 是 () => 形式的箭头函数
+            advance(); // 消费 )
+            match(TokenType::ARROW); // 消费 =>
+            std::vector<std::shared_ptr<Stmt>> body;
+            if (check(TokenType::LEFT_BRACE))
+            {
+                // 块体
+                consume(TokenType::LEFT_BRACE, "Expect '{'.");
+                auto blockStmt = std::static_pointer_cast<BlockStmt>(block());
+                body = blockStmt->statements;
+            }
+            else
+            {
+                // 简写: => expr
+                // 将表达式包装在 return 语句中
+                auto expr = expression();
+                body.push_back(std::make_shared<ReturnStmt>(Token{TokenType::RETURN, "return", previous().line, {}}, expr));
+            }
+            return std::make_shared<ArrowFunctionExpr>(std::vector<Token>(), body);
+        }
+
+        // 检查是否是 (params) => 的情况
+        if (check(TokenType::IDENTIFIER))
+        {
+            // 检查标识符后面是否是逗号或右括号
+            Token next = peekNext();
+            if (next.type == TokenType::COMMA || next.type == TokenType::RIGHT_PAREN)
+            {
+                // 可能是箭头函数: (params) => body
+                // 先解析参数列表
+                std::vector<Token> params;
+                do { params.push_back(consume(TokenType::IDENTIFIER, "Expect parameter name.")); }
+                while (match(TokenType::COMMA));
+                consume(TokenType::RIGHT_PAREN, "Expect ')' after parameters.");
+
+                // 检查是否有 =>
+                if (match(TokenType::ARROW))
+                {
+                    // 是箭头函数
+                    std::vector<std::shared_ptr<Stmt>> body;
+                    if (check(TokenType::LEFT_BRACE))
+                    {
+                        // 块体
+                        consume(TokenType::LEFT_BRACE, "Expect '{'.");
+                        auto blockStmt = std::static_pointer_cast<BlockStmt>(block());
+                        body = blockStmt->statements;
+                    }
+                    else
+                    {
+                        // 简写: => expr
+                        // 将表达式包装在 return 语句中
+                        auto expr = expression();
+                        body.push_back(std::make_shared<ReturnStmt>(Token{TokenType::RETURN, "return", previous().line, {}}, expr));
+                    }
+                    return std::make_shared<ArrowFunctionExpr>(params, body);
+                }
+            }
+        }
+
+        // 普通括号表达式
         auto e = expression();
         consume(TokenType::RIGHT_PAREN, "Expect ')'.");
         return e;

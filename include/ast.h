@@ -114,6 +114,17 @@ struct FunctionExpr : Expr
     }
 };
 
+// 箭头函数表达式
+struct ArrowFunctionExpr : Expr
+{
+    std::vector<Token> params;
+    std::vector<std::shared_ptr<Stmt>> body; // 函数体（可以是语句列表）
+
+    ArrowFunctionExpr(auto p, auto b) : params(p), body(b)
+    {
+    }
+};
+
 // 自增自减表达式
 struct UpdateExpr : Expr
 {
