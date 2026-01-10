@@ -560,20 +560,28 @@ void Compiler::compileExpr(const std::shared_ptr<Expr>& expr)
             index = currentChunk()->addConstant(vm.newString(update->name.lexeme));
         }
 
-        emitBytes(static_cast<uint8_t>(getOp), static_cast<uint8_t>(index));
-        emitConstant(currentChunk()->addConstant(1.0));
-
-        if (update->isIncrement) emitByte(static_cast<uint8_t>(OpCode::OP_ADD));
-        else emitByte(static_cast<uint8_t>(OpCode::OP_SUB));
-
-        emitBytes(static_cast<uint8_t>(setOp), static_cast<uint8_t>(index));
-
         if (update->isPostfix)
         {
-            emitConstant(currentChunk()->addConstant(1.0));
+            // 后置递增/递减: 先获取原始值并保存到栈上，再执行运算
+            emitBytes(static_cast<uint8_t>(getOp), static_cast<uint8_t>(index)); // 原始值入栈 (保存用于返回)
 
-            if (update->isIncrement) emitByte(static_cast<uint8_t>(OpCode::OP_SUB)); // i++: new - 1 = old
-            else emitByte(static_cast<uint8_t>(OpCode::OP_ADD)); // i--: new + 1 = old
+            emitBytes(static_cast<uint8_t>(getOp), static_cast<uint8_t>(index)); // 再次获取值用于运算
+            emitConstant(currentChunk()->addConstant(1.0));
+            if (update->isIncrement) emitByte(static_cast<uint8_t>(OpCode::OP_ADD));
+            else emitByte(static_cast<uint8_t>(OpCode::OP_SUB));
+            emitBytes(static_cast<uint8_t>(setOp), static_cast<uint8_t>(index)); // 保存运算后的值
+
+            // 现在栈上是: 原始值, 运算后的值 -> 需要弹出运算后的值，保留原始值在栈顶
+            emitByte(static_cast<uint8_t>(OpCode::OP_POP)); // 弹出运算后的值
+        }
+        else
+        {
+            // 前置递增/递减: 先运算，再返回新值
+            emitBytes(static_cast<uint8_t>(getOp), static_cast<uint8_t>(index));
+            emitConstant(currentChunk()->addConstant(1.0));
+            if (update->isIncrement) emitByte(static_cast<uint8_t>(OpCode::OP_ADD));
+            else emitByte(static_cast<uint8_t>(OpCode::OP_SUB));
+            emitBytes(static_cast<uint8_t>(setOp), static_cast<uint8_t>(index));
         }
     }
 }
