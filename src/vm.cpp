@@ -403,7 +403,13 @@ void VM::run()
                 stack.pop_back();
                 break;
             }
-        case OpCode::OP_CONSTANT: stack.push_back(READ_CONST());
+        case OpCode::OP_CONSTANT:
+            {
+                uint8_t highByte = READ_BYTE();
+                uint8_t lowByte = READ_BYTE();
+                uint16_t constIdx = highByte << 8 | lowByte;
+                stack.push_back(frame->closure->function->chunk.constants[constIdx]);
+            }
             break;
         case OpCode::OP_NIL: stack.emplace_back(std::monostate{});
             break;
@@ -1157,10 +1163,9 @@ void VM::runEventLoop()
 
             try
             {
-                // 清理栈，确保没有残留值
-                size_t stackSizeBefore = stack.size();
+                const size_t stackSizeBefore = stack.size();
 
-                // 在主 VM 上执行回调
+                // 推入回调函数并执行
                 stack.emplace_back(task.callback);
                 frames.push_back({task.callback, task.callback->function->chunk.code.data(), 0});
                 run();

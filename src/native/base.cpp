@@ -28,8 +28,7 @@ Value nativePrint(VM& vm, const int argc, const Value* args)
 
 Value nativePrintln(VM& vm, const int argc, const Value* args)
 {
-    nativePrint(vm, argc, args);
-    std::cout << std::endl;
+    for (int i = 0; i < argc; i++) std::cout << valToString(args[i]) << (i < argc - 1 ? " " : "") << std::endl;
     return std::monostate{};
 }
 

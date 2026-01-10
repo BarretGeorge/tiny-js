@@ -40,6 +40,13 @@ void Compiler::emitLoop(const int start) const
     emitByte(o & 0xff);
 }
 
+void Compiler::emitConstant(const int index) const
+{
+    emitByte(static_cast<uint8_t>(OpCode::OP_CONSTANT));
+    emitByte(static_cast<uint8_t>(index >> 8 & 0xff));
+    emitByte(static_cast<uint8_t>(index & 0xff));
+}
+
 int Compiler::resolveLocal(const CompilerState* s, const std::string& n)
 {
     for (int i = s->locals.size() - 1; i >= 0; i--) if (s->locals[i].name == n) return i;
@@ -305,26 +312,19 @@ void Compiler::compileStmt(const std::shared_ptr<Stmt>& stmt)
             modulePath = modulePath.substr(1, modulePath.size() - 2);
         }
         const int pathIdx = currentChunk()->addConstant(vm.newString(modulePath));
-        emitBytes(static_cast<uint8_t>(OpCode::OP_CONSTANT), static_cast<uint8_t>(pathIdx));
+        emitConstant(pathIdx);
 
-        emitBytes(static_cast<uint8_t>(OpCode::OP_CALL), 1); // 调用 require(path)，1个参数
-        // 栈顶现在是 exports 对象
+        emitBytes(static_cast<uint8_t>(OpCode::OP_CALL), 1);
 
-        // 3. 对于每个导入的名称，从 exports 对象中提取属性并定义为全局变量
         for (size_t i = 0; i < import_stmt->specifiers.size(); i++)
         {
-            // 如果不是第一个 specifier，需要复制 exports 对象
-            // 因为 OP_GET_PROPERTY 会消耗对象
             if (i > 0)
             {
-                // 重新调用 require 获取 exports 对象
-                // 注意：必须按正确的顺序压栈：先 callee，再参数
                 emitBytes(static_cast<uint8_t>(OpCode::OP_GET_GLOBAL), static_cast<uint8_t>(requireIdx));
-                emitBytes(static_cast<uint8_t>(OpCode::OP_CONSTANT), static_cast<uint8_t>(pathIdx));
+                emitConstant(pathIdx);
                 emitBytes(static_cast<uint8_t>(OpCode::OP_CALL), 1);
             }
 
-            // 获取属性 exports.name
             const auto& spec = import_stmt->specifiers[i];
             const int propNameIdx = currentChunk()->addConstant(vm.newString(spec.lexeme));
             emitBytes(static_cast<uint8_t>(OpCode::OP_GET_PROPERTY), static_cast<uint8_t>(propNameIdx));
@@ -336,9 +336,6 @@ void Compiler::compileStmt(const std::shared_ptr<Stmt>& stmt)
     }
     else if (const auto export_stmt = std::dynamic_pointer_cast<ExportStmt>(stmt))
     {
-        // export { add, area, PI }
-        // 将每个变量设置为 exports 对象的属性
-
         for (const auto& spec : export_stmt->specifiers)
         {
             // 获取变量值
@@ -355,9 +352,6 @@ void Compiler::compileStmt(const std::shared_ptr<Stmt>& stmt)
                 }
             }
 
-            // 注意：OP_SET_PROPERTY 期望栈顶是对象，次栈顶是值
-            // 所以要先压入对象，再压入值
-            // 获取 exports 全局对象
             const int exportsIdx = currentChunk()->addConstant(vm.newString("exports"));
             emitBytes(static_cast<uint8_t>(OpCode::OP_GET_GLOBAL), static_cast<uint8_t>(exportsIdx));
 
@@ -371,11 +365,7 @@ void Compiler::compileStmt(const std::shared_ptr<Stmt>& stmt)
                 emitBytes(static_cast<uint8_t>(OpCode::OP_GET_GLOBAL), static_cast<uint8_t>(varNameIdx));
             }
 
-            // 设置属性 exports.name = value
-            // 栈状态: [value, exports]
             emitBytes(static_cast<uint8_t>(OpCode::OP_SET_PROPERTY), static_cast<uint8_t>(varNameIdx));
-
-            // OP_SET_PROPERTY leaves value on stack, pop it
             emitByte(static_cast<uint8_t>(OpCode::OP_POP));
         }
     }
@@ -386,13 +376,13 @@ void Compiler::compileExpr(const std::shared_ptr<Expr>& expr)
     if (const auto e = std::dynamic_pointer_cast<Literal>(expr))
     {
         if (std::holds_alternative<double>(e->value))
-            emitBytes(static_cast<uint8_t>(OpCode::OP_CONSTANT),
-                      static_cast<uint8_t>(currentChunk()->addConstant(
-                          std::get<double>(e->value))));
+            emitConstant(currentChunk()->addConstant(std::get<double>(e->value)));
         else if (std::holds_alternative<std::string>(e->value))
-            emitBytes(
-                static_cast<uint8_t>(OpCode::OP_CONSTANT),
-                static_cast<uint8_t>(currentChunk()->addConstant(vm.newString(std::get<std::string>(e->value)))));
+        {
+            const std::string strVal = std::get<std::string>(e->value);
+            const int constIdx = currentChunk()->addConstant(vm.newString(strVal));
+            emitConstant(constIdx);
+        }
         else if (std::holds_alternative<bool>(e->value))
             emitByte(
                 std::get<bool>(e->value)
@@ -571,8 +561,7 @@ void Compiler::compileExpr(const std::shared_ptr<Expr>& expr)
         }
 
         emitBytes(static_cast<uint8_t>(getOp), static_cast<uint8_t>(index));
-        emitBytes(static_cast<uint8_t>(OpCode::OP_CONSTANT),
-                  static_cast<uint8_t>(currentChunk()->addConstant(1.0)));
+        emitConstant(currentChunk()->addConstant(1.0));
 
         if (update->isIncrement) emitByte(static_cast<uint8_t>(OpCode::OP_ADD));
         else emitByte(static_cast<uint8_t>(OpCode::OP_SUB));
@@ -581,8 +570,7 @@ void Compiler::compileExpr(const std::shared_ptr<Expr>& expr)
 
         if (update->isPostfix)
         {
-            emitBytes(static_cast<uint8_t>(OpCode::OP_CONSTANT),
-                      static_cast<uint8_t>(currentChunk()->addConstant(1.0)));
+            emitConstant(currentChunk()->addConstant(1.0));
 
             if (update->isIncrement) emitByte(static_cast<uint8_t>(OpCode::OP_SUB)); // i++: new - 1 = old
             else emitByte(static_cast<uint8_t>(OpCode::OP_ADD)); // i--: new + 1 = old
@@ -602,7 +590,7 @@ void Compiler::compileFunctionExpression(const std::shared_ptr<FunctionExpr>& ex
     {
         next->function->name = expr->name.lexeme;
     }
-    else
+    else // 匿名函数
     {
         next->function->name = "<anonymous>";
     }
@@ -660,7 +648,7 @@ void Compiler::compileArrowFunctionExpression(const std::shared_ptr<ArrowFunctio
     next->function = vm.allocate<ObjFunction>();
     vm.tempRoots.push_back(next->function);
 
-    // 设置函数基本信息
+    // 箭头函数基本信息
     next->function->name = "<arrow>";
     next->function->arity = static_cast<int>(expr->params.size());
 

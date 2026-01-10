@@ -48,6 +48,9 @@ class Compiler
     // 发出两个字节指令
     void emitBytes(uint8_t b1, uint8_t b2) const;
 
+    // 发出常量指令
+    void emitConstant(int index) const;
+
     // 发出跳转指令，返回跳转指令的偏移位置
     [[nodiscard]] int emitJump(OpCode op) const;
 

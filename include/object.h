@@ -4,7 +4,6 @@
 #include "common.h"
 #include "functional"
 #include <map>
-#include <utility>
 
 enum class ObjType
 {
@@ -276,7 +275,8 @@ struct ObjClass : Obj
 struct ObjInstance : Obj
 {
     ObjClass* klass;
-    std::map<std::string, Value> fields; // 字段表
+    // 字段表
+    std::map<std::string, Value> fields;
 
     explicit ObjInstance(ObjClass* c) : Obj(ObjType::INSTANCE), klass(c)
     {
