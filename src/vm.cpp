@@ -611,6 +611,13 @@ void VM::run()
                 stack.emplace_back(a / b);
                 break;
             }
+        case OpCode::OP_NOT:
+            {
+                Value v = stack.back();
+                stack.pop_back();
+                stack.emplace_back(!toBool(v));
+                break;
+            }
         case OpCode::OP_MOD:
             {
                 double b = std::get<double>(stack.back());

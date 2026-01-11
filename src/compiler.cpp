@@ -441,6 +441,18 @@ void Compiler::compileExpr(const std::shared_ptr<Expr>& expr)
             patchJump(trueJump);
         }
     }
+    else if (const auto unary = std::dynamic_pointer_cast<Unary>(expr))
+    {
+        compileExpr(unary->right);
+        if (unary->op.type == TokenType::BANG)
+        {
+            emitByte(static_cast<uint8_t>(OpCode::OP_NOT));
+        }
+        else if (unary->op.type == TokenType::MINUS)
+        {
+            emitByte(static_cast<uint8_t>(OpCode::OP_NEGATE));
+        }
+    }
     else if (const auto variable = std::dynamic_pointer_cast<Variable>(expr))
     {
         if (int arg = resolveLocal(current, variable->name.lexeme); arg != -1)
