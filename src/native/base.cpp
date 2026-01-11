@@ -179,7 +179,7 @@ Value nativeStringToUpper(VM& vm, int argc, const Value* args)
         upperStr.begin(),
         [](const unsigned char c)
         {
-            return std::tolower(c);
+            return std::toupper(c);
         }
     );
     return Value{new ObjString(upperStr)};
