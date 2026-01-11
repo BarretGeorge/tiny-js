@@ -113,7 +113,7 @@ function factorial(n) {
 }
 
 println("8. 递归函数测试:");
-println("factorial(5) = " + factorial(5));
+println("factorial(10) = " + factorial(10));
 println("======================");
 
 

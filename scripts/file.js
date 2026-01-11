@@ -13,3 +13,5 @@ println("文件大小: " + f.size());
 // Clean up
 f = File("test.txt");
 println("删除结果: " + f.remove());
+
+println("文件是否存在: " + f.exists());

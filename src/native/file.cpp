@@ -106,5 +106,14 @@ void registerNativeFile(VM& vm)
         return std::remove(handle->path.c_str()) == 0;
     };
 
+    methods["exists"] = [](const int argc, const Value* args) -> Value
+    {
+        const auto* handle = static_cast<FileHandle*>(dynamic_cast<ObjNativeInstance*>(std::get<Obj*>(args[-1]))->data);
+
+        if (!handle) return false;
+
+        return std::filesystem::exists(handle->path);
+    };
+
     vm.defineNativeClass("File", methods);
 }

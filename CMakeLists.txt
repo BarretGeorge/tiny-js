@@ -17,9 +17,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(asmjit)
 
-# 不需要手动设置 arch 定义，asmjit 库会自动检测
-
-
 file(GLOB SOURCES "src/*.cpp" "src/native/*.cpp")
 
 add_executable(tiny_js main.cpp ${SOURCES})

@@ -26,10 +26,14 @@ struct CallFrame
 struct EventTask
 {
     ObjClosure* callback;
-    uint64_t executeTime; // 执行时间戳（毫秒）
-    bool isInterval; // 是否为 interval 任务
-    std::string intervalId; // interval 的 ID（仅 interval 任务需要）
-    int intervalMs; // interval 的间隔（仅 interval 任务需要）
+    // 执行时间戳（毫秒）
+    uint64_t executeTime;
+    // 是否为 interval 任务
+    bool isInterval;
+    // interval 的 ID（仅 interval 任务需要）
+    std::string intervalId;
+    // interval 的间隔（仅 interval 任务需要）
+    int intervalMs;
 };
 
 class VM
@@ -98,14 +102,8 @@ public:
 
     VM()
     {
-        stack.reserve(2048);
-    }
-
-    // 用于模块系统的构造函数，复制全局变量
-    explicit VM(const std::map<std::string, Value>& globalVars)
-    {
-        stack.reserve(2048);
-        globals = globalVars;
+        // 预留大小 防止频繁扩容
+       stack.reserve(2048);
     }
 
     ~VM() { freeObjects(); }

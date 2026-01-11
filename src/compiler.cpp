@@ -465,7 +465,7 @@ void Compiler::compileExpr(const std::shared_ptr<Expr>& expr)
             emitBytes(static_cast<uint8_t>(OpCode::OP_GET_UPVALUE), static_cast<uint8_t>(arg));
         else
             emitGlobalOp(static_cast<uint8_t>(OpCode::OP_GET_GLOBAL),
-                      currentChunk()->addConstant(vm.newString(variable->name.lexeme)));
+                         currentChunk()->addConstant(vm.newString(variable->name.lexeme)));
     }
     else if (const auto assign = std::dynamic_pointer_cast<Assign>(expr))
     {
@@ -489,7 +489,7 @@ void Compiler::compileExpr(const std::shared_ptr<Expr>& expr)
         else
         {
             emitGlobalOp(static_cast<uint8_t>(OpCode::OP_SET_GLOBAL),
-                      currentChunk()->addConstant(vm.newString(assign->name.lexeme)));
+                         currentChunk()->addConstant(vm.newString(assign->name.lexeme)));
         }
     }
     else if (const auto call = std::dynamic_pointer_cast<Call>(expr))
