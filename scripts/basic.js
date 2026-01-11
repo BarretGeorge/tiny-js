@@ -1,3 +1,10 @@
+function assert(actual, message) {
+    if (!actual) {
+        println("断言失败: " + message);
+        exit(1);
+    }
+}
+
 // 1. 变量声明和类型测试
 println("1. 变量声明和类型测试:");
 var num = 10;
@@ -53,6 +60,8 @@ if (x < y) {
 } else {
     println("x < y: false");
 }
+println("1=='1': ", 1 == '1');
+println("1==='1': ", 1 === '1');
 
 var result = x > 5 ? "大于5" : "小于等于5";
 println("三元运算符: " + result);
@@ -66,7 +75,9 @@ while (count < 5) {
     println(count);
     count++;
 }
+assert(count === 5, "while 循环计数错误");
 println("======================");
+
 
 // 7. 函数测试
 println("7. 函数测试:");
@@ -95,7 +106,7 @@ println("======================");
 
 // 8. 阶乘函数（递归）
 function factorial(n) {
-    if (n == 0 || n == 1) {
+    if (n === 0 || n === 1) {
         return 1;
     }
     return n * factorial(n - 1);

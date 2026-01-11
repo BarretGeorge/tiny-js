@@ -325,7 +325,8 @@ std::shared_ptr<Expr> Parser::assignment()
 std::shared_ptr<Expr> Parser::equality()
 {
     auto e = comparison();
-    while (match(TokenType::BANG_EQUAL) || match(TokenType::EQUAL_EQUAL))
+    while (match(TokenType::BANG_EQUAL) || match(TokenType::EQUAL_EQUAL) ||
+           match(TokenType::BANG_EQUAL_EQUAL) || match(TokenType::EQUAL_EQUAL_EQUAL))
     {
         Token op = previous();
         e = std::make_shared<Binary>(e, op, comparison());

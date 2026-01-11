@@ -82,15 +82,29 @@ void Scanner::scanToken(std::vector<Token>& t)
         else
             addToken(t, TokenType::STAR);
         break;
-    case '!': addToken(t, match('=') ? TokenType::BANG_EQUAL : TokenType::BANG);
+    case '!':
+        if (match('=')) {
+            if (match('=')) {
+                addToken(t, TokenType::BANG_EQUAL_EQUAL);
+            } else {
+                addToken(t, TokenType::BANG_EQUAL);
+            }
+        } else {
+            addToken(t, TokenType::BANG);
+        }
         break;
     case '=':
-        if (match('='))
-            addToken(t, TokenType::EQUAL_EQUAL);
-        else if (match('>'))
+        if (match('=')) {
+            if (match('=')) {
+                addToken(t, TokenType::EQUAL_EQUAL_EQUAL);
+            } else {
+                addToken(t, TokenType::EQUAL_EQUAL);
+            }
+        } else if (match('>')) {
             addToken(t, TokenType::ARROW);
-        else
+        } else {
             addToken(t, TokenType::EQUAL);
+        }
         break;
     case '|':
         if (match('|'))

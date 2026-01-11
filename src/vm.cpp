@@ -495,6 +495,80 @@ void VM::run()
                 stack.emplace_back(a == b);
                 break;
             }
+        case OpCode::OP_STRICT_EQUAL:
+            {
+                Value b = stack.back();
+                stack.pop_back();
+                Value a = stack.back();
+                stack.pop_back();
+
+                // 严格相等
+                bool result = false;
+                if (a.index() == b.index())
+                {
+                    if (std::holds_alternative<std::monostate>(a) && std::holds_alternative<std::monostate>(b))
+                    {
+                        result = true;
+                    }
+                    else if (std::holds_alternative<bool>(a) && std::holds_alternative<bool>(b))
+                    {
+                        result = std::get<bool>(a) == std::get<bool>(b);
+                    }
+                    else if (std::holds_alternative<double>(a) && std::holds_alternative<double>(b))
+                    {
+                        result = std::get<double>(a) == std::get<double>(b);
+                    }
+                    else if (std::holds_alternative<Obj*>(a) && std::holds_alternative<Obj*>(b))
+                    {
+                        // 特殊处理字符串
+                        auto o1 = std::get<Obj*>(a);
+                        auto o2 = std::get<Obj*>(b);
+                        if (o1->type == ObjType::STRING && o2->type == ObjType::STRING)
+                        {
+                            auto s1 = dynamic_cast<ObjString*>(o1);
+                            auto s2 = dynamic_cast<ObjString*>(o2);
+                            result = s1->chars == s2->chars;
+                        }
+                        else
+                        {
+                            result = o1 == o2;
+                        }
+                    }
+                }
+                stack.emplace_back(result);
+                break;
+            }
+        case OpCode::OP_STRICT_NOT_EQUAL:
+            {
+                Value b = stack.back();
+                stack.pop_back();
+                Value a = stack.back();
+                stack.pop_back();
+
+                // 严格不相等：类型不同 或者 (类型相同但值不同)
+                bool result = true;
+                if (a.index() == b.index())
+                {
+                    if (std::holds_alternative<std::monostate>(a) && std::holds_alternative<std::monostate>(b))
+                    {
+                        result = false;
+                    }
+                    else if (std::holds_alternative<bool>(a) && std::holds_alternative<bool>(b))
+                    {
+                        result = std::get<bool>(a) != std::get<bool>(b);
+                    }
+                    else if (std::holds_alternative<double>(a) && std::holds_alternative<double>(b))
+                    {
+                        result = std::get<double>(a) != std::get<double>(b);
+                    }
+                    else if (std::holds_alternative<Obj*>(a) && std::holds_alternative<Obj*>(b))
+                    {
+                        result = std::get<Obj*>(a) != std::get<Obj*>(b);
+                    }
+                }
+                stack.emplace_back(result);
+                break;
+            }
         case OpCode::OP_AND:
             {
                 bool b = toBool(stack.back());

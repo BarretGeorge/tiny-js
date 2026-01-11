@@ -410,6 +410,8 @@ void Compiler::compileExpr(const std::shared_ptr<Expr>& expr)
         else if (t == TokenType::SLASH) emitByte(static_cast<uint8_t>(OpCode::OP_DIV));
         else if (t == TokenType::PERCENT) emitByte(static_cast<uint8_t>(OpCode::OP_MOD));
         else if (t == TokenType::EQUAL_EQUAL) emitByte(static_cast<uint8_t>(OpCode::OP_EQUAL));
+        else if (t == TokenType::EQUAL_EQUAL_EQUAL) emitByte(static_cast<uint8_t>(OpCode::OP_STRICT_EQUAL));
+        else if (t == TokenType::BANG_EQUAL_EQUAL) emitByte(static_cast<uint8_t>(OpCode::OP_STRICT_NOT_EQUAL));
         else if (t == TokenType::LESS) emitByte(static_cast<uint8_t>(OpCode::OP_LESS));
         else if (t == TokenType::LESS_EQUAL)
         {

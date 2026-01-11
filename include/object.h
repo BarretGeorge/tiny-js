@@ -68,6 +68,10 @@ enum class OpCode : uint8_t
     OP_SET_UPVALUE,
     // 相等比较
     OP_EQUAL,
+    // 严格相等比较
+    OP_STRICT_EQUAL,
+    // 严格不相等比较
+    OP_STRICT_NOT_EQUAL,
     // 大于比较
     OP_GREATER,
     // 小于比较
@@ -128,7 +132,7 @@ enum class OpCode : uint8_t
     OP_NEW,
 };
 
-static constexpr std::array<std::string_view, 42> opCodeNames = {
+static constexpr std::array<std::string_view, 44> opCodeNames = {
     "OP_CONSTANT",
     "OP_NIL",
     "OP_TRUE",
@@ -142,6 +146,8 @@ static constexpr std::array<std::string_view, 42> opCodeNames = {
     "OP_GET_UPVALUE",
     "OP_SET_UPVALUE",
     "OP_EQUAL",
+    "OP_STRICT_EQUAL",
+    "OP_STRICT_NOT_EQUAL",
     "OP_GREATER",
     "OP_LESS",
     "OP_ADD",
