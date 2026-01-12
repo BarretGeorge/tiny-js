@@ -370,7 +370,11 @@ std::shared_ptr<Expr> Parser::factor()
 
 std::shared_ptr<Expr> Parser::unary()
 {
-    if (match(TokenType::BANG) || match(TokenType::MINUS)) return std::make_shared<Unary>(previous(), unary());
+    if (match(TokenType::BANG) || match(TokenType::MINUS))
+    {
+        const Token op = previous();
+        return std::make_shared<Unary>(op, unary());
+    }
 
     if (match(TokenType::PLUS_PLUS) || match(TokenType::MINUS_MINUS))
     {
